@@ -6,7 +6,15 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection.
 
 ## Recent Changes
-- **2025-11-20 (Latest):** Backend integration and architecture optimization
+- **2025-11-20 (Latest Session):** System fully operational with automatic database seeding
+  - Fixed CORS issues by adding Vite proxy configuration (frontend /api → backend localhost:3000)
+  - Created automatic seeding system with simulated data (100 days) for instant functionality
+  - Simplified API client to use relative URLs through proxy
+  - Updated documentation with quick start guide (QUICK_START.md)
+  - Validated end-to-end: Backend seed (500 records) → API (10 opportunities) → Frontend display
+  - System ready for daily automated collection at 21:00 BRT
+
+- **2025-11-20 (Earlier):** Backend integration and architecture optimization
   - Created Express backend server (port 3000) with REST API
   - Integrated Supabase PostgreSQL for data persistence
   - Implemented automated data collection (cron job at 21:00 daily)
