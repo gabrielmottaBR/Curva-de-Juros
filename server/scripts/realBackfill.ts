@@ -1,7 +1,7 @@
 import { supabase, DI1Price } from '../config/supabase';
 import { AVAILABLE_MATURITIES } from '../constants';
-import { formatDateISO, getLastNBusinessDays, formatDateBR } from '../utils/businessDays';
-import { fetchB3RatesForDate } from '../collectors/b3Scraper';
+import { formatDateISO, getLastNBusinessDays, formatDateForB3 } from '../utils/businessDays';
+import { fetchB3DailyRates } from '../collectors/b3Scraper';
 import { recalculateOpportunities } from '../jobs/dailyCollection';
 
 export const runRealBackfill = async (days: number = 100): Promise<void> => {
@@ -20,24 +20,24 @@ export const runRealBackfill = async (days: number = 100): Promise<void> => {
   for (let i = 0; i < businessDays.length; i++) {
     const date = businessDays[i];
     const dateStr = formatDateISO(date);
-    const dateBR = formatDateBR(date);
+    const dateBR = formatDateForB3(date);
     const progress = ((i + 1) / businessDays.length * 100).toFixed(1);
     
     console.log(`[${progress}%] Fetching ${dateBR} (${dateStr})...`);
 
     try {
-      const rates = await fetchB3RatesForDate(date);
+      const ratesDict = await fetchB3DailyRates(date);
       
-      if (rates && rates.length > 0) {
-        rates.forEach(rate => {
+      if (ratesDict && Object.keys(ratesDict).length > 0) {
+        Object.entries(ratesDict).forEach(([contractCode, rate]) => {
           records.push({
-            contract_code: rate.contractCode,
+            contract_code: contractCode,
             date: dateStr,
-            rate: rate.rate
+            rate: rate
           });
         });
         successCount++;
-        console.log(`  ✓ Found ${rates.length} contracts`);
+        console.log(`  ✓ Found ${Object.keys(ratesDict).length} contracts`);
       } else {
         failCount++;
         console.log(`  ✗ No data available`);
@@ -99,12 +99,10 @@ export const runRealBackfill = async (days: number = 100): Promise<void> => {
   console.log(`${'='.repeat(60)}\n`);
 };
 
-if (require.main === module) {
-  runRealBackfill(100).then(() => {
-    console.log('Backfill script finished.\n');
-    process.exit(0);
-  }).catch(err => {
-    console.error('Backfill script failed:', err);
-    process.exit(1);
-  });
-}
+runRealBackfill(100).then(() => {
+  console.log('Backfill script finished.\n');
+  process.exit(0);
+}).catch(err => {
+  console.error('Backfill script failed:', err);
+  process.exit(1);
+});
