@@ -45,12 +45,11 @@ const App: React.FC = () => {
 
       try {
         // Small delay to let UI mount before heavy lifting
-        setTimeout(async () => {
-           const result = await scanOpportunities(handleProgress);
-           setOpportunities(result.opportunities);
-           setDataMode(result.mode);
-           setIsLoadingScanner(false);
-        }, 500);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const result = await scanOpportunities(handleProgress);
+        setOpportunities(result.opportunities);
+        setDataMode(result.mode);
+        setIsLoadingScanner(false);
       } catch (err) {
         console.error("App init failed", err);
         setIsLoadingScanner(false);

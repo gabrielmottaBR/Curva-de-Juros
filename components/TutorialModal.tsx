@@ -27,9 +27,9 @@ export const TutorialContent: React.FC = () => {
 
       <section>
         <h3 className="text-emerald-400 font-bold text-lg mb-2">3. Arbitragem Estatística (Z-Score)</h3>
-        <p className="text-sm mb-2">Buscamos reversão à média no spread entre duas curvas. Quando o spread desvia significativamente (Z-Score > 2 ou &lt; -2), apostamos que retornará à média.</p>
+        <p className="text-sm mb-2">Buscamos reversão à média no spread entre duas curvas. Quando o spread desvia significativamente (Z-Score &gt; 2 ou &lt; -2), apostamos que retornará à média.</p>
         <ul className="list-disc list-inside text-sm mt-2 space-y-1 text-slate-400">
-          <li><strong className="text-rose-400">Z > 2 (Caro):</strong> Vender Spread (Vender Longa / Comprar Curta).</li>
+          <li><strong className="text-rose-400">Z &gt; 2 (Caro):</strong> Vender Spread (Vender Longa / Comprar Curta).</li>
           <li><strong className="text-emerald-400">Z &lt; -2 (Barato):</strong> Comprar Spread (Comprar Longa / Vender Curta).</li>
         </ul>
       </section>
