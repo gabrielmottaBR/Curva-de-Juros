@@ -1,10 +1,13 @@
 export enum Maturity {
-  JAN25 = 'DI1F25',
-  JUL25 = 'DI1N25',
-  JAN26 = 'DI1F26',
   JAN27 = 'DI1F27',
+  JAN28 = 'DI1F28',
   JAN29 = 'DI1F29',
+  JAN30 = 'DI1F30',
   JAN31 = 'DI1F31',
+  JAN32 = 'DI1F32',
+  JAN33 = 'DI1F33',
+  JAN34 = 'DI1F34',
+  JAN35 = 'DI1F35',
 }
 
 export interface MarketDataPoint {
