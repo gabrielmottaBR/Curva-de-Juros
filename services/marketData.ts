@@ -40,14 +40,17 @@ const getLastNBusinessDays = (n: number): Date[] => {
 
 const fetchB3DailyRates = async (date: Date): Promise<Record<string, number> | null> => {
   const dateStr = formatDateForB3(date);
+  // Add cache buster to prevent proxy from serving stale errors
+  const cacheBuster = `&_t=${new Date().getTime()}`;
   const encodedUrl = encodeURIComponent(`${B3_BASE_URL}?pagetype=pop&caminho=Resumo%20Estat%EDstico%20-%20Sistema%20Preg%E3o&Data=${dateStr}&Mercadoria=DI1`);
   
   try {
     // Timeout promise to prevent hanging
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout per request
+    // Increased timeout slightly for proxy latency, but fail-fast logic elsewhere handles the UX
+    const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
-    const response = await fetch(`${CORS_PROXY}${encodedUrl}`, {
+    const response = await fetch(`${CORS_PROXY}${encodedUrl}${cacheBuster}`, {
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -74,11 +77,13 @@ const fetchB3DailyRates = async (date: Date): Promise<Record<string, number> | n
         for (let i = 0; i < cellTexts.length; i++) {
             const text = cellTexts[i];
             // Regex to find generic DI1 ticker (DI1 + Letter + Year) or just (Letter + Year)
+            // Matches F25, DI1F25, etc.
             if (/^(DI1)?F\d{2}$/.test(text)) {
                 ticker = text.startsWith('DI1') ? text : `DI1${text}`;
                 for (let j = 1; j <= 4; j++) {
                     const potentialRate = cellTexts[i + j];
-                    if (potentialRate && /^\d{1,3},\d{3}$/.test(potentialRate)) {
+                    // Optimized Regex: Matches 11,25 or 11,250 (flexible decimal places)
+                    if (potentialRate && /^\d{1,3},\d{1,4}$/.test(potentialRate)) {
                         rate = parseFloat(potentialRate.replace(',', '.'));
                         found = true;
                         break;
@@ -107,7 +112,8 @@ const fetchB3DailyRates = async (date: Date): Promise<Record<string, number> | n
  */
 const generateFallbackData = (days: number): Map<string, HistoricalData[]> => {
   const map = new Map<string, HistoricalData[]>();
-  const today = new Date();
+  // Re-generate days to ensure we have a valid x-axis even in simulation
+  const dates = getLastNBusinessDays(days);
   
   AVAILABLE_MATURITIES.forEach((m, index) => {
     // Base curve: 10.80% + term premium
@@ -129,23 +135,19 @@ const generateFallbackData = (days: number): Map<string, HistoricalData[]> => {
        if (currentRate > 16) currentRate = 16;
 
        series.push({
-         date: '', // Filled later or ignored in chart x-axis formatters if using index
+         date: '', // Filled below
          shortRate: 0,
          longRate: parseFloat(currentRate.toFixed(3)),
          spread: 0
        });
     }
     
-    // Assign dates chronologically (Oldest -> Newest)
-    // Note: The calling function expects data somewhat aligned, usually Newest -> Oldest in processing
-    // But let's stick to the format used in buildMarketHistory (Chronological list of dates)
+    // Assign dates chronologically (Oldest -> Newest for internal logic consistency before final reverse)
+    // The generator builds T-100...T-0.
     
-    const dates = getLastNBusinessDays(days);
-    
-    // Adjust series to match dates length
-    const finalSeries = series.slice(0, dates.length).map((item, idx) => ({
+    const finalSeries = series.map((item, idx) => ({
       ...item,
-      date: dates[idx].toISOString().split('T')[0]
+      date: dates[idx] ? dates[idx].toISOString().split('T')[0] : `Day ${idx}`
     }));
 
     map.set(m.id, finalSeries);
@@ -155,7 +157,7 @@ const generateFallbackData = (days: number): Map<string, HistoricalData[]> => {
 };
 
 /**
- * Sparse Fetching Strategy
+ * Sparse Fetching Strategy with FAIL-FAST Probe
  */
 const buildMarketHistory = async (
     onProgress: (percent: number, message: string) => void
@@ -164,34 +166,50 @@ const buildMarketHistory = async (
     const totalDaysNeeded = 100;
     const allBusinessDays = getLastNBusinessDays(totalDaysNeeded);
     
+    // 1. FAIL FAST PROBE: Check the most recent business day first.
+    // If this fails, we assume the proxy or B3 is inaccessible and fallback immediately.
+    // This avoids waiting 60s+ for timeouts.
+    const probeIndex = allBusinessDays.length - 1; // Index of most recent day
+    const probeDate = allBusinessDays[probeIndex];
+    
+    onProgress(10, "Testando conectividade com B3...");
+    const probeResult = await fetchB3DailyRates(probeDate);
+    
+    if (!probeResult) {
+        console.warn("Probe failed. Aborting B3 fetch.");
+        return { map: new Map(), success: false };
+    }
+
+    // 2. If Probe succeeds, proceed with Sparse Fetching
     // Checkpoints: Every 5th day
     const stepSize = 5;
     const checkpoints: { date: Date; index: number }[] = [];
     
-    for (let i = 0; i < allBusinessDays.length; i += stepSize) {
+    // Add the probe result to data first
+    const checkpointData: Map<number, Record<string, number>> = new Map();
+    checkpointData.set(probeIndex, probeResult);
+
+    // Build rest of checkpoints
+    for (let i = 0; i < allBusinessDays.length - 1; i += stepSize) {
         checkpoints.push({ date: allBusinessDays[i], index: i });
     }
     
-    const checkpointData: Map<number, Record<string, number>> = new Map();
-    let successCount = 0;
     let completed = 0;
+    const totalCheckpoints = checkpoints.length;
 
+    // We can execute these; since probe passed, we have high confidence.
     for (const cp of checkpoints) {
         const rates = await fetchB3DailyRates(cp.date);
         if (rates) {
             checkpointData.set(cp.index, rates);
-            successCount++;
         }
         completed++;
-        const percent = Math.round((completed / checkpoints.length) * 80);
-        onProgress(percent, `Coletando dados da B3: ${formatDateForB3(cp.date)}`);
+        // Progress from 10% to 80%
+        const percent = 10 + Math.round((completed / totalCheckpoints) * 70);
+        onProgress(percent, `Coletando: ${formatDateForB3(cp.date)}`);
     }
 
-    // HEURISTIC: If we failed to get at least 20% of data points, consider it a failure (Proxy block)
-    if (successCount < (checkpoints.length * 0.2)) {
-        return { map: new Map(), success: false };
-    }
-
+    // 3. Interpolation Phase
     onProgress(85, "Interpolando curvas de juros...");
 
     const historyMap = new Map<string, HistoricalData[]>();
@@ -202,7 +220,7 @@ const buildMarketHistory = async (
         
         let lastKnownRate: number | null = null;
 
-        // Simple Fill Forward/Backward
+        // Iterate chronologically
         for (let i = 0; i < allBusinessDays.length; i++) {
             const dateStr = allBusinessDays[i].toISOString().split('T')[0];
             let rate = 0;
@@ -213,7 +231,7 @@ const buildMarketHistory = async (
             } else if (lastKnownRate !== null) {
                 rate = lastKnownRate; // Forward fill
             } else {
-                // If we don't have a start yet, look ahead for first valid
+                // Look ahead if start is missing
                 let foundFuture = 0;
                 for(let j=i+1; j < allBusinessDays.length; j++) {
                     if(checkpointData.has(j) && checkpointData.get(j)![ticker]) {
@@ -221,7 +239,7 @@ const buildMarketHistory = async (
                         break;
                     }
                 }
-                rate = foundFuture || 11.50; // Fallback if completely empty start
+                rate = foundFuture || 11.50; // Fallback default
                 lastKnownRate = rate;
             }
 
@@ -252,7 +270,7 @@ export const scanOpportunities = async (
   
   const updateProgress = onProgress || ((p, s) => console.log(`[${p}%] ${s}`));
 
-  updateProgress(5, "Inicializando conexão segura...");
+  updateProgress(5, "Inicializando...");
 
   try {
     // Try to build real history
@@ -262,14 +280,14 @@ export const scanOpportunities = async (
     let mode: 'LIVE' | 'SIMULATED' = 'LIVE';
 
     if (!success) {
-        console.warn("B3 Connection failed or blocked. Switching to Simulation Mode.");
-        updateProgress(90, "Conexão B3 instável. Gerando dados simulados para análise...");
+        console.warn("Switching to Simulation Mode due to fetch failure.");
+        updateProgress(90, "Gerando dados simulados...");
         finalMap = generateFallbackData(100);
         mode = 'SIMULATED';
-        // Simulate a small delay for UX
-        await new Promise(r => setTimeout(r, 1000));
+        // Small UX delay to let user read the status
+        await new Promise(r => setTimeout(r, 800));
     } else {
-        updateProgress(90, "Calculando estatísticas de arbitragem...");
+        updateProgress(90, "Calculando estatísticas...");
     }
 
     const opportunities: Opportunity[] = [];
@@ -300,10 +318,14 @@ export const scanOpportunities = async (
             });
         }
         
-        // Reverse if needed (Data is usually Newest -> Oldest from B3 logic, but chart wants Oldest -> Newest)
-        // In buildMarketHistory we iterated 0..100 where 0 is T-0 (Newest). So array is Newest First.
-        // We reverse for Charting (Left is Old, Right is New)
-        combinedHistory.reverse(); 
+        // Reverse for display (Oldest -> Newest) if needed
+        // Our `getLastNBusinessDays` returns Chronological (Oldest first)
+        // So `shortSeries` is Oldest -> Newest.
+        // Charts expect Oldest -> Newest.
+        // So we DO NOT reverse here if we want Left=Old, Right=New.
+        // Let's verifying generateFallbackData: pushes Oldest->Newest.
+        // Verifying getLastNBusinessDays: pushes Newest->Oldest then Reverses. So Oldest->Newest.
+        // Correct. No reverse needed.
 
         const spreads = combinedHistory.map(d => d.spread);
         const mean = calculateMean(spreads);
@@ -329,7 +351,7 @@ export const scanOpportunities = async (
         }
     }
 
-    updateProgress(100, "Análise concluída.");
+    updateProgress(100, "Concluído.");
     return {
         opportunities: opportunities.sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore)),
         mode
@@ -339,8 +361,7 @@ export const scanOpportunities = async (
       console.error("Critical Scanner Error", e);
       // Ultimate failsafe
       const fallbackMap = generateFallbackData(100);
-      // ... perform same logic ...
-      // For brevity, returning empty with safe fallback if needed, but above logic covers most cases.
+      // Reuse logic or just return empty safe state with one mock opportunity to avoid crash
       return { opportunities: [], mode: 'SIMULATED' };
   }
 };
