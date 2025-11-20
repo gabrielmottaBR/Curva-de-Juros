@@ -1,0 +1,107 @@
+import React from 'react';
+import { CalculationResult, Allocation, RiskParams } from '../types';
+import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
+
+interface ActionTableProps {
+  calc: CalculationResult;
+  allocation: Allocation;
+  shortLabel: string;
+  longLabel: string;
+  risk: RiskParams;
+}
+
+const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel, longLabel, risk }) => {
+  const isBuy = calc.recommendation === 'BUY SPREAD';
+  const isSell = calc.recommendation === 'SELL SPREAD';
+  
+  const actionColor = isBuy ? 'text-emerald-400' : (isSell ? 'text-rose-400' : 'text-slate-400');
+  const boxColor = isBuy ? 'bg-emerald-500/10 border-emerald-500/30' : (isSell ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-800 border-slate-700');
+
+  const recommendationText = isBuy ? 'COMPRAR SPREAD' : (isSell ? 'VENDER SPREAD' : 'NEUTRO');
+
+  return (
+    <div className={`rounded-xl border ${boxColor} p-6`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          {isBuy && <TrendingUp className="w-8 h-8 text-emerald-500" />}
+          {isSell && <TrendingDown className="w-8 h-8 text-rose-500" />}
+          <div>
+             <h2 className="text-lg font-bold text-white">Recomendação do Modelo</h2>
+             <div className={`text-2xl font-black tracking-wide ${actionColor}`}>
+               {recommendationText}
+             </div>
+          </div>
+        </div>
+        <div className="text-right">
+           <div className="text-xs text-slate-400 uppercase tracking-wider">Z-Score</div>
+           <div className={`text-3xl font-mono font-bold ${
+             calc.zScore > 2 ? 'text-rose-400' : (calc.zScore < -2 ? 'text-emerald-400' : 'text-slate-200')
+           }`}>
+             {calc.zScore.toFixed(2)}
+           </div>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left text-slate-300">
+            <thead className="text-xs text-slate-400 uppercase bg-slate-900/50">
+                <tr>
+                    <th className="px-4 py-3 rounded-l-lg">Leg</th>
+                    <th className="px-4 py-3">Operação</th>
+                    <th className="px-4 py-3 text-right">Quantidade</th>
+                    <th className="px-4 py-3 text-right rounded-r-lg">Exposição</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+                {/* Short Maturity Row */}
+                <tr className="bg-slate-800/30">
+                    <td className="px-4 py-3 font-medium text-white">{shortLabel}</td>
+                    <td className="px-4 py-3">
+                       {isBuy ? <span className="text-emerald-400 font-bold">COMPRAR</span> : <span className="text-rose-400 font-bold">VENDER</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-base">{allocation.shortContracts}</td>
+                     <td className="px-4 py-3 text-right font-mono text-slate-400">
+                        R$ {(allocation.shortContracts * calc.puShort).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                    </td>
+                </tr>
+                 {/* Long Maturity Row */}
+                <tr className="bg-slate-800/30">
+                    <td className="px-4 py-3 font-medium text-white">{longLabel}</td>
+                    <td className="px-4 py-3">
+                       {isBuy ? <span className="text-rose-400 font-bold">VENDER</span> : <span className="text-emerald-400 font-bold">COMPRAR</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-base">{allocation.longContracts}</td>
+                     <td className="px-4 py-3 text-right font-mono text-slate-400">
+                         R$ {(allocation.longContracts * calc.puLong).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                     </td>
+                </tr>
+            </tbody>
+        </table>
+      </div>
+
+      <div className="mt-6 flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+        <div className="flex-1 flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+                <div className="text-xs text-slate-400">Risco Financeiro</div>
+                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk.toLocaleString()}</div>
+            </div>
+        </div>
+         <div className="flex-1 border-l border-slate-700 pl-4">
+            <div className="text-xs text-slate-400">Hedge Ratio</div>
+            <div className="font-mono font-bold text-slate-200">{calc.hedgeRatio.toFixed(3)}</div>
+        </div>
+        <div className="flex-1 border-l border-slate-700 pl-4">
+            <div className="text-xs text-slate-400">Cointegração (Proxy p-val)</div>
+            <div className={`font-mono font-bold ${calc.cointegrationPValue < 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {calc.cointegrationPValue}
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ActionTable;

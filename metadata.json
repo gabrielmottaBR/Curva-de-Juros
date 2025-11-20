@@ -1,0 +1,5 @@
+{
+  "name": "Curva de Juros",
+  "description": "A professional frontend-only statistical arbitrage system for Brazilian DI1 Futures. Features real-time calculation of PU, DV01, Cointegration, and Z-Score with dynamic risk management.",
+  "requestFramePermissions": []
+}
