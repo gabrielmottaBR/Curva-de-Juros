@@ -9,6 +9,12 @@ import { isBusinessDay, formatDateISO } from '../utils/businessDays';
 export const collectDailyData = async (): Promise<void> => {
   const today = new Date();
   
+  const startDate = new Date('2025-11-21T00:00:00-03:00');
+  if (today < startDate) {
+    console.log(`Scheduled start date is ${startDate.toLocaleDateString('pt-BR')}. Skipping collection.`);
+    return;
+  }
+  
   if (!isBusinessDay(today)) {
     console.log('Today is not a business day. Skipping data collection.');
     return;
@@ -112,5 +118,6 @@ export const startDailyCronJob = (): void => {
   });
 
   console.log('Daily cron job scheduled for 21:00 Brasília Time (America/Sao_Paulo)');
+  console.log('Collection will start from: 21/11/2025');
   console.log(`Current server time: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
 };

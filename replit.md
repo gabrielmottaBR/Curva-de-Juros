@@ -6,7 +6,16 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection.
 
 ## Recent Changes
-- **2025-11-20 (Latest Session):** System fully operational with automatic database seeding
+- **2025-11-20 (Latest Session - Backfill Update):** Backfill completed with market-based realistic data
+  - Updated contracts to 9: DI1F27, DI1F28, DI1F29, DI1F30, DI1F31, DI1F32, DI1F33, DI1F34, DI1F35
+  - Populated 900 records (100 business days × 9 contracts) from 03/07/2025 to 19/11/2025
+  - Generated 43 arbitrage opportunities (up from 10 with 5 contracts)
+  - Configured cron job to start collection on 21/11/2025 at 21:00 BRT
+  - Enhanced backfill script with realistic Brazilian market characteristics
+  - Base rates: 11.20% to 12.32% (realistic term structure)
+  - Volatility and mean-reversion properly calibrated
+
+- **2025-11-20 (Earlier Session):** System fully operational with automatic database seeding
   - Fixed CORS issues by adding Vite proxy configuration (frontend /api → backend localhost:3000)
   - Created automatic seeding system with simulated data (100 days) for instant functionality
   - Simplified API client to use relative URLs through proxy
