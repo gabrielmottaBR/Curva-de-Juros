@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend Connection Test</title>
+</head>
+<body>
+    <h1>Testing Backend Connection</h1>
+    <div id="status">Testing...</div>
+    <pre id="result"></pre>
+    
+    <script>
+        const urls = [
+            'http://localhost:3000/health',
+            'https://786b2f0f-61c2-4319-a08d-97ec680ff3a0-00-3000.riker.replit.dev/health',
+            'https://786b2f0f-61c2-4319-a08d-97ec680ff3a0--3000.riker.replit.dev/health',
+            window.location.protocol + '//' + window.location.hostname + ':3000/health'
+        ];
+        
+        async function testURL(url) {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                return { url, success: true, data };
+            } catch (error) {
+                return { url, success: false, error: error.message };
+            }
+        }
+        
+        Promise.all(urls.map(testURL)).then(results => {
+            document.getElementById('result').textContent = JSON.stringify(results, null, 2);
+            const working = results.find(r => r.success);
+            if (working) {
+                document.getElementById('status').innerHTML = '<strong style="color:green">✓ Backend accessible at: ' + working.url + '</strong>';
+            } else {
+                document.getElementById('status').innerHTML = '<strong style="color:red">✗ Backend not accessible</strong>';
+            }
+        });
+    </script>
+</body>
+</html>

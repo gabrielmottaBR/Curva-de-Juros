@@ -1,23 +1,8 @@
 import { Opportunity } from '../types';
 
-const getBackendURL = (): string => {
-  if (import.meta.env.VITE_BACKEND_URL) {
-    return `${import.meta.env.VITE_BACKEND_URL}/api`;
-  }
-  
-  if (typeof window === 'undefined') return 'http://localhost:3000/api';
-  
-  const currentHost = window.location.hostname;
-  if (currentHost.includes('replit.dev') || currentHost.includes('.repl.co')) {
-    const parts = currentHost.split('.');
-    parts[0] = parts[0].replace(/00-\d+$/, '00-3000');
-    return `${window.location.protocol}//${parts.join('.')}/api`;
-  }
-  
-  return 'http://localhost:3000/api';
-};
-
-const API_BASE_URL = getBackendURL();
+const API_BASE_URL = (import.meta as any).env?.VITE_BACKEND_URL 
+  ? `${(import.meta as any).env.VITE_BACKEND_URL}/api`
+  : 'http://localhost:3000/api';
 
 export interface ScanResult {
   opportunities: Opportunity[];

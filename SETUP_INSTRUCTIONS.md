@@ -28,14 +28,18 @@ As seguintes variáveis já foram configuradas nos Replit Secrets:
 Quando o backend é iniciado pela primeira vez:
 
 1. Verifica se existem dados no banco (`di1_prices`)
-2. Se não houver dados, inicia a **população inicial em background**
-3. Busca dados dos últimos **100 dias úteis** da B3
-4. Insere no banco de dados Supabase
+2. Se não houver dados:
+   - **Popula automaticamente com dados simulados** (100 dias úteis)
+   - Calcula oportunidades de arbitragem
+   - **Aplicação fica funcional imediatamente** (1-2 segundos)
 
-**ATENÇÃO:** A população inicial pode levar alguns minutos (5-10 min) porque:
-- Precisa buscar 100 dias de dados
-- A API da B3 pode estar lenta ou indisponível para datas futuras
-- Há um delay de 500ms entre cada requisição para não sobrecarregar a B3
+**NOVO:** Agora o sistema usa dados simulados para que você possa testar imediatamente!
+
+**Coleta Real de Dados:**
+- Cron job configurado para rodar às **21:00 horário de Brasília**
+- Tenta buscar dados reais da B3
+- Se B3 estiver indisponível, mantém dados simulados
+- Atualiza apenas em **dias úteis**
 
 Você pode acompanhar o progresso nos logs do workflow "Backend Server".
 
