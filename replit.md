@@ -6,12 +6,14 @@ This is a React + TypeScript + Vite web application that analyzes Brazilian inte
 **Current State:** Imported from GitHub and configured for Replit environment.
 
 ## Recent Changes
-- **2025-11-20:** Initial Replit setup
+- **2025-11-20:** Initial Replit setup completed
   - Updated Vite config to use port 5000 (required for Replit webview)
   - Configured HMR client port for proper hot module reload in Replit
+  - Added allowedHosts: ['all'] to enable Replit's dynamic proxy hostnames
   - Installed all npm dependencies
   - Created workflow for frontend dev server
-  - GEMINI_API_KEY environment variable needs to be set by user
+  - GEMINI_API_KEY environment variable set via Replit Secrets
+  - Configured static deployment (dist folder)
 
 ## Project Architecture
 
