@@ -34,22 +34,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Pair not found' });
     }
 
+    const details = JSON.parse(opportunity.details_json || '{}');
+    
     const response = {
       id: opportunity.pair_id,
-      shortId: opportunity.short_contract,
-      longId: opportunity.long_contract,
+      shortId: opportunity.short_id,
+      longId: opportunity.long_id,
+      shortLabel: opportunity.short_label,
+      longLabel: opportunity.long_label,
       currentSpread: opportunity.current_spread,
       zScore: opportunity.z_score,
       recommendation: opportunity.recommendation,
       meanSpread: opportunity.mean_spread,
       stdDevSpread: opportunity.std_dev_spread,
       cointegrationPValue: opportunity.cointegration_p_value || 0,
-      puShort: opportunity.pu_short || 0,
-      puLong: opportunity.pu_long || 0,
-      dv01Short: opportunity.dv01_short || 0,
-      dv01Long: opportunity.dv01_long || 0,
-      hedgeRatio: opportunity.hedge_ratio || 1,
-      lastUpdate: opportunity.last_update
+      historicalData: details.historicalData || [],
+      puShort: details.puShort || 0,
+      puLong: details.puLong || 0,
+      dv01Short: details.dv01Short || 0,
+      dv01Long: details.dv01Long || 0,
+      hedgeRatio: details.hedgeRatio || 1
     };
 
     return res.status(200).json(response);

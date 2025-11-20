@@ -45,21 +45,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const opportunities = cachedOpportunities.map(row => ({
       id: row.pair_id,
-      shortId: row.short_contract,
-      longId: row.long_contract,
+      shortId: row.short_id,
+      longId: row.long_id,
+      shortLabel: row.short_label,
+      longLabel: row.long_label,
       currentSpread: row.current_spread,
       zScore: row.z_score,
       recommendation: row.recommendation,
-      meanSpread: row.mean_spread,
-      stdDevSpread: row.std_dev_spread,
-      lastUpdate: row.last_update
+      historicalData: []
     }));
 
+    const sorted = opportunities.sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore));
+
     return res.status(200).json({
-      opportunities,
-      count: opportunities.length,
-      mode: 'LIVE',
-      timestamp: new Date().toISOString()
+      opportunities: sorted,
+      count: sorted.length,
+      mode: 'LIVE'
     });
 
   } catch (error) {

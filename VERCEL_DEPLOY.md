@@ -80,25 +80,33 @@ As serverless functions substituem o backend Express em produção!
 
 ---
 
-## ⚠️ Limitações do Vercel Serverless
+## ⚠️ Limitações Importantes
 
-1. **Cron Jobs não funcionam** - O agendamento diário (21:00 BRT) NÃO rodará no Vercel
-2. **Dados não são atualizados automaticamente** - Você precisará manter o backend Replit rodando OU usar Vercel Cron Jobs
+### 1. Dados Estáticos no Vercel
 
-### Solução Recomendada: Vercel Cron Jobs
+O site no Vercel mostra **apenas os dados que já estão no Supabase**. Ele NÃO coleta novos dados automaticamente.
 
-Adicione ao `vercel.json`:
+**O que acontece:**
+- ✅ Frontend deployado no Vercel funciona perfeitamente
+- ✅ API lê dados do Supabase e exibe no dashboard
+- ❌ Coleta automática diária (21:00 BRT) **NÃO roda** no Vercel
+- ❌ Dados param de ser atualizados após o deploy
 
-```json
-{
-  "crons": [{
-    "path": "/api/cron/daily-collection",
-    "schedule": "0 21 * * *"
-  }]
-}
-```
+### 2. Opções para Manter Dados Atualizados
 
-E crie `api/cron/daily-collection.ts` para coletar dados diariamente.
+**Opção A: Manter Replit Rodando (Recomendado)**
+- Deixe o backend Replit rodando 24/7 (use Replit Always On)
+- Ele continuará coletando dados diariamente às 21:00
+- O Vercel lerá os dados atualizados do Supabase
+
+**Opção B: Vercel Cron Jobs (Plano Pro)**
+- Requer plano Vercel Pro ($20/mês)
+- Adicionar função serverless para coletar dados
+- Configurar cron job no Vercel para rodar diariamente
+
+**Opção C: Atualização Manual**
+- Rode o backfill manualmente quando precisar de dados novos
+- Execute: `tsx server/scripts/enhancedBackfill.ts` no Replit
 
 ---
 
