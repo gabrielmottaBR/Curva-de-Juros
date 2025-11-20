@@ -282,17 +282,8 @@ export const scanOpportunities = async (
     if (!success) {
         console.warn("Switching to Simulation Mode due to fetch failure.");
         updateProgress(90, "Gerando dados simulados...");
-        try {
-          finalMap = generateFallbackData(100);
-          console.log("Fallback data generated successfully, map size:", finalMap.size);
-        } catch (err) {
-          console.error("Error generating fallback data:", err);
-          throw err;
-        }
+        finalMap = generateFallbackData(100);
         mode = 'SIMULATED';
-        // Small UX delay to let user read the status
-        await new Promise(r => setTimeout(r, 800));
-        console.log("Continuing after simulation delay...");
     } else {
         updateProgress(90, "Calculando estatísticas...");
     }
@@ -300,13 +291,10 @@ export const scanOpportunities = async (
     const opportunities: Opportunity[] = [];
     const maturities = AVAILABLE_MATURITIES;
 
-    console.log("Starting opportunity calculation, maturities:", maturities.length);
-
     for (let i = 0; i < maturities.length; i++) {
         for (let j = i + 1; j < maturities.length; j++) {
         const short = maturities[i];
         const long = maturities[j];
-        console.log(`Processing pair: ${short.id} - ${long.id}`);
 
         const shortSeries = finalMap.get(short.id);
         const longSeries = finalMap.get(long.id);
@@ -361,9 +349,7 @@ export const scanOpportunities = async (
         }
     }
 
-    console.log("Opportunities calculated:", opportunities.length);
     updateProgress(100, "Concluído.");
-    console.log("Returning scan result with mode:", mode);
     return {
         opportunities: opportunities.sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore)),
         mode

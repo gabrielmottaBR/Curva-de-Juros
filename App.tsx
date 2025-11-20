@@ -44,8 +44,6 @@ const App: React.FC = () => {
       };
 
       try {
-        // Small delay to let UI mount before heavy lifting
-        await new Promise(resolve => setTimeout(resolve, 500));
         const result = await scanOpportunities(handleProgress);
         setOpportunities(result.opportunities);
         setDataMode(result.mode);
