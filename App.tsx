@@ -18,6 +18,7 @@ import {
   checkCointegration,
   calculateAllocation
 } from './utils/math';
+import { AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   const [isLoadingScanner, setIsLoadingScanner] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState("Iniciando...");
+  const [dataMode, setDataMode] = useState<'LIVE' | 'SIMULATED'>('LIVE');
   
   const [isEduOpen, setIsEduOpen] = useState(false);
 
@@ -41,12 +43,18 @@ const App: React.FC = () => {
         setLoadingStatus(status);
       };
 
-      // Small delay to let UI mount before heavy lifting
-      setTimeout(async () => {
-         const results = await scanOpportunities(handleProgress);
-         setOpportunities(results);
-         setIsLoadingScanner(false);
-      }, 500);
+      try {
+        // Small delay to let UI mount before heavy lifting
+        setTimeout(async () => {
+           const result = await scanOpportunities(handleProgress);
+           setOpportunities(result.opportunities);
+           setDataMode(result.mode);
+           setIsLoadingScanner(false);
+        }, 500);
+      } catch (err) {
+        console.error("App init failed", err);
+        setIsLoadingScanner(false);
+      }
     };
     initScanner();
   }, []);
@@ -104,11 +112,24 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 pb-20">
-      <Header onOpenEdu={() => setIsEduOpen(true)} />
+      <Header onOpenEdu={() => setIsEduOpen(true)} connectionStatus={dataMode} />
       <TutorialModal isOpen={isEduOpen} onClose={() => setIsEduOpen(false)} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
+        {dataMode === 'SIMULATED' && !isLoadingScanner && (
+          <div className="mb-6 bg-amber-500/10 border border-amber-500/30 p-4 rounded-lg flex items-start gap-3 animate-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-amber-500">Aviso de Conexão B3</h4>
+              <p className="text-xs text-slate-300 mt-1">
+                Não foi possível obter os dados reais da B3 neste momento (bloqueio de proxy ou instabilidade). 
+                O sistema está operando em <strong>Modo Simulado</strong> com dados gerados matematicamente para fins de demonstração.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Section 1: Scanner & Selection */}
         <div className="mb-8">
            <h2 className="text-xl font-bold text-white mb-4">Scanner de Mercado</h2>
