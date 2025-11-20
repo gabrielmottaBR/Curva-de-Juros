@@ -7,23 +7,17 @@ import ActionTable from './components/ActionTable';
 import TutorialModal, { TutorialContent } from './components/TutorialModal';
 import OpportunityList from './components/OpportunityList';
 import { CalculationResult, Opportunity, RiskParams } from './types';
-import { AVAILABLE_MATURITIES, RISK_DEFAULTS } from './constants';
+import { RISK_DEFAULTS } from './constants';
 import { scanOpportunities } from './services/marketData';
-import { 
-  calculatePU, 
-  calculateDV01, 
-  calculateMean, 
-  calculateStdDev, 
-  calculateZScore, 
-  checkCointegration,
-  calculateAllocation
-} from './utils/math';
+import { fetchPairDetails, DetailedOpportunity } from './services/api';
+import { calculateAllocation } from './utils/math';
 import { AlertCircle } from 'lucide-react';
 
 const App: React.FC = () => {
   // State
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
+  const [detailedOpportunity, setDetailedOpportunity] = useState<DetailedOpportunity | null>(null);
   const [riskParams, setRiskParams] = useState<RiskParams>(RISK_DEFAULTS);
   
   const [isLoadingScanner, setIsLoadingScanner] = useState(true);
@@ -56,51 +50,43 @@ const App: React.FC = () => {
     initScanner();
   }, []);
 
-  // 2. Calculate Detailed Stats for Selected Opportunity
-  const calculationResult: CalculationResult | null = useMemo(() => {
-    if (!selectedOpportunity) return null;
+  // 2. Fetch Detailed Stats When Opportunity Selected
+  useEffect(() => {
+    const loadDetails = async () => {
+      if (!selectedOpportunity) {
+        setDetailedOpportunity(null);
+        return;
+      }
 
-    const { historicalData, shortId, longId } = selectedOpportunity;
-    const latest = historicalData[historicalData.length - 1];
-    const shortConfig = AVAILABLE_MATURITIES.find(m => m.id === shortId)!;
-    const longConfig = AVAILABLE_MATURITIES.find(m => m.id === longId)!;
-
-    // Financials
-    const puShort = calculatePU(latest.shortRate, shortConfig.defaultDu);
-    const puLong = calculatePU(latest.longRate, longConfig.defaultDu);
-    const dv01Short = calculateDV01(latest.shortRate, shortConfig.defaultDu);
-    const dv01Long = calculateDV01(latest.longRate, longConfig.defaultDu);
-
-    // Statistics (Recalculated here for the dashboard view context, though available in opp summary)
-    const spreads = historicalData.map(d => d.spread);
-    const meanSpread = calculateMean(spreads);
-    const stdDevSpread = calculateStdDev(spreads, meanSpread);
-    const zScore = calculateZScore(latest.spread, meanSpread, stdDevSpread);
+      try {
+        const details = await fetchPairDetails(selectedOpportunity.id);
+        setDetailedOpportunity(details);
+      } catch (err) {
+        console.error('Failed to fetch pair details:', err);
+        setDetailedOpportunity(null);
+      }
+    };
     
-    // Cointegration Check
-    const shorts = historicalData.map(d => d.shortRate);
-    const longs = historicalData.map(d => d.longRate);
-    const cointegrationPValue = checkCointegration(shorts, longs);
+    loadDetails();
+  }, [selectedOpportunity]);
 
-    // Recommendation
-    let recommendation: 'BUY SPREAD' | 'SELL SPREAD' | 'NEUTRAL' = 'NEUTRAL';
-    if (zScore < -1.5) recommendation = 'BUY SPREAD';
-    if (zScore > 1.5) recommendation = 'SELL SPREAD';
+  const calculationResult: CalculationResult | null = useMemo(() => {
+    if (!detailedOpportunity) return null;
 
     return {
-      puShort,
-      puLong,
-      dv01Short,
-      dv01Long,
-      currentSpread: latest.spread,
-      meanSpread,
-      stdDevSpread,
-      zScore,
-      cointegrationPValue,
-      hedgeRatio: dv01Long / dv01Short,
-      recommendation
+      puShort: detailedOpportunity.puShort,
+      puLong: detailedOpportunity.puLong,
+      dv01Short: detailedOpportunity.dv01Short,
+      dv01Long: detailedOpportunity.dv01Long,
+      currentSpread: detailedOpportunity.currentSpread,
+      meanSpread: detailedOpportunity.meanSpread,
+      stdDevSpread: detailedOpportunity.stdDevSpread,
+      zScore: detailedOpportunity.zScore,
+      cointegrationPValue: detailedOpportunity.cointegrationPValue,
+      hedgeRatio: detailedOpportunity.hedgeRatio,
+      recommendation: detailedOpportunity.recommendation
     };
-  }, [selectedOpportunity]);
+  }, [detailedOpportunity]);
 
   const allocation = useMemo(() => {
     if (!calculationResult) return null;
@@ -170,7 +156,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Section 2: Detailed Dashboard (Only visible when selected) */}
-        {selectedOpportunity && calculationResult && allocation ? (
+        {selectedOpportunity && detailedOpportunity && calculationResult && allocation ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -223,7 +209,7 @@ const App: React.FC = () => {
               </div>
               <div className="lg:col-span-2 h-full">
                  <Charts 
-                    data={selectedOpportunity.historicalData}
+                    data={detailedOpportunity.historicalData}
                   />
               </div>
             </div>

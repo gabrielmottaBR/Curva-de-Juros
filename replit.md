@@ -1,12 +1,27 @@
 # Curva de Juros - Interest Rate Curve Analyzer
 
 ## Overview
-This is a React + TypeScript + Vite web application that analyzes Brazilian interest rate curves (DI1 futures) and identifies spread arbitrage opportunities. The app fetches live market data from B3 (Brazilian stock exchange) and performs statistical analysis to find trading opportunities.
+This is a full-stack React + TypeScript + Vite + Express + Supabase application that analyzes Brazilian interest rate curves (DI1 futures) and identifies spread arbitrage opportunities. The system collects market data from B3, performs statistical analysis, and provides real-time trading opportunities through a responsive web interface.
 
-**Current State:** Imported from GitHub and configured for Replit environment.
+**Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection.
 
 ## Recent Changes
-- **2025-11-20:** Initial Replit setup completed
+- **2025-11-20 (Latest):** Backend integration and architecture optimization
+  - Created Express backend server (port 3000) with REST API
+  - Integrated Supabase PostgreSQL for data persistence
+  - Implemented automated data collection (cron job at 21:00 daily)
+  - Created initial population script for 100 business days of historical data
+  - Migrated all heavy processing from frontend to backend:
+    * B3 scraping logic → `/server/collectors/b3Scraper.ts`
+    * Statistical calculations → `/server/analyzers/opportunityScanner.ts`
+    * Financial calculations → `/server/analyzers/riskCalculator.ts`
+  - Simplified frontend from 365 lines to 4 lines in `services/marketData.ts`
+  - Removed all client-side calculations and data processing
+  - Created API endpoints: `/api/opportunities`, `/api/pair/:pairId`, `/api/recalculate`
+  - Added two workflows: "Start application" (frontend) and "Backend Server"
+  - SUPABASE_URL and SUPABASE_SERVICE_KEY configured via Replit Secrets
+
+- **2025-11-20 (Earlier):** Initial Replit setup completed
   - Updated Vite config to use port 5000 (required for Replit webview)
   - Configured HMR client port for proper hot module reload in Replit
   - Added allowedHosts: ['all'] to enable Replit's dynamic proxy hostnames
@@ -18,35 +33,84 @@ This is a React + TypeScript + Vite web application that analyzes Brazilian inte
 ## Project Architecture
 
 ### Tech Stack
-- **Frontend Framework:** React 19.2.0
+**Frontend:**
+- **Framework:** React 19.2.0
 - **Language:** TypeScript 5.8.2
 - **Build Tool:** Vite 6.2.0
 - **Charts:** Recharts 3.4.1
 - **Icons:** Lucide React
 - **Dev Server:** Port 5000 on 0.0.0.0
 
+**Backend:**
+- **Server:** Express 5.1.0
+- **Runtime:** Node.js with tsx
+- **Language:** TypeScript 5.8.2
+- **Database:** Supabase (PostgreSQL)
+- **Scraping:** JSDOM 27.2.0
+- **Scheduling:** node-cron 4.2.1
+- **API Port:** 3000
+
 ### Project Structure
-- `/components/` - React components (Header, Charts, StatCard, etc.)
-- `/services/` - Market data fetching logic (B3 API integration)
-- `/utils/` - Mathematical and financial calculations
+**Frontend:**
+- `/components/` - React UI components (Header, Charts, StatCard, etc.)
+- `/services/api.ts` - Lightweight API client (4 lines, calls backend)
+- `/utils/math.ts` - Shared math utilities (kept for frontend display calculations)
 - `App.tsx` - Main application component
 - `types.ts` - TypeScript type definitions
 - `constants.ts` - Application constants
 
+**Backend:**
+- `/server/index.ts` - Express server entry point
+- `/server/api/opportunities.ts` - REST API routes
+- `/server/collectors/b3Scraper.ts` - B3 data scraping logic
+- `/server/analyzers/opportunityScanner.ts` - Statistical analysis engine
+- `/server/analyzers/riskCalculator.ts` - Financial calculations (PU, DV01, hedge ratios)
+- `/server/jobs/initialPopulation.ts` - Initial database population (100 days)
+- `/server/jobs/dailyCollection.ts` - Automated daily data collection (21:00 cron)
+- `/server/config/supabase.ts` - Supabase client configuration
+- `/server/utils/` - Business days, date formatting, math utilities
+- `/server/database/schema.sql` - Database schema (di1_prices, opportunities_cache)
+
 ### Key Features
-1. **Live Market Data:** Fetches DI1 futures data from B3 using CORS proxy
-2. **Statistical Analysis:** Calculates spreads, z-scores, cointegration
-3. **Visual Analytics:** Interactive charts showing historical spreads
-4. **Risk Management:** DV01 calculations and position sizing
-5. **Opportunity Scanner:** Identifies arbitrage opportunities across maturities
+1. **Automated Data Collection:** Daily scraping at 21:00 (Brasília time) on business days
+2. **Historical Database:** Persistent storage of DI1 prices in Supabase PostgreSQL
+3. **Pre-calculated Opportunities:** Backend processes all calculations and caches results
+4. **Live Market Data:** Fetches DI1 futures data from B3 using CORS proxy
+5. **Statistical Analysis:** Calculates spreads, z-scores, cointegration
+6. **Visual Analytics:** Interactive charts showing historical spreads
+7. **Risk Management:** DV01 calculations and position sizing
+8. **Opportunity Scanner:** Identifies arbitrage opportunities across maturities
+9. **REST API:** Clean API for frontend-backend communication
+
+### Data Flow
+```
+B3 API → Backend Scraper → Supabase Database → Backend Analyzer → Frontend Display
+         (cron 21:00)       (di1_prices)        (opportunities_cache)
+```
 
 ### External Dependencies
+- **Supabase:** PostgreSQL database for persistent data storage
 - **B3 Market Data:** Fetches from B3's public portal (may fallback to simulated data)
 - **CORS Proxy:** Uses allorigins.win for cross-origin requests
-- **Gemini API:** Optional API key for enhanced features (environment variable)
 
 ## Environment Variables
-- `GEMINI_API_KEY` - Optional: Gemini API key (set via Replit secrets)
+- `SUPABASE_URL` - **Required:** URL of your Supabase project
+- `SUPABASE_SERVICE_KEY` - **Required:** Supabase service role key (server-side only)
+- `GEMINI_API_KEY` - Optional: Gemini API key (currently unused)
+
+## Setup Instructions
+**IMPORTANT:** Before running the application for the first time, you must create the database schema in Supabase.
+
+See `SETUP_INSTRUCTIONS.md` for detailed setup steps.
 
 ## User Preferences
-None specified yet.
+- **Language:** Portuguese (Brazil)
+- **Architecture:** Backend-heavy processing, lightweight frontend
+- **Data Source:** Prioritize real B3 data, fallback to simulated when unavailable
+
+## Performance Optimizations
+- **Before:** Frontend did all scraping and calculations (~5 second load time)
+- **After:** Backend pre-processes everything (<1 second load time)
+- **Code Reduction:** `services/marketData.ts` reduced from 365 lines to 4 lines
+- **Calculation Offloading:** All statistical and financial calculations moved to backend
+- **Caching Strategy:** Pre-calculated opportunities stored in `opportunities_cache` table

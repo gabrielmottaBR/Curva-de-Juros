@@ -1,0 +1,104 @@
+import { Opportunity } from '../types';
+
+const getBackendURL = (): string => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return `${import.meta.env.VITE_BACKEND_URL}/api`;
+  }
+  
+  if (typeof window === 'undefined') return 'http://localhost:3000/api';
+  
+  const currentHost = window.location.hostname;
+  if (currentHost.includes('replit.dev') || currentHost.includes('.repl.co')) {
+    const parts = currentHost.split('.');
+    parts[0] = parts[0].replace(/00-\d+$/, '00-3000');
+    return `${window.location.protocol}//${parts.join('.')}/api`;
+  }
+  
+  return 'http://localhost:3000/api';
+};
+
+const API_BASE_URL = getBackendURL();
+
+export interface ScanResult {
+  opportunities: Opportunity[];
+  mode: 'LIVE' | 'SIMULATED';
+}
+
+export interface DetailedOpportunity extends Opportunity {
+  meanSpread: number;
+  stdDevSpread: number;
+  cointegrationPValue: number;
+  puShort: number;
+  puLong: number;
+  dv01Short: number;
+  dv01Long: number;
+  hedgeRatio: number;
+}
+
+export const fetchOpportunities = async (
+  onProgress?: (percent: number, status: string) => void
+): Promise<ScanResult> => {
+  try {
+    if (onProgress) {
+      onProgress(10, 'Conectando ao servidor...');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/opportunities`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch opportunities: ${response.statusText}`);
+    }
+
+    if (onProgress) {
+      onProgress(50, 'Recebendo dados...');
+    }
+
+    const data = await response.json();
+    
+    if (onProgress) {
+      onProgress(100, 'Concluído');
+    }
+
+    return {
+      opportunities: data.opportunities || [],
+      mode: data.mode || 'LIVE'
+    };
+  } catch (error) {
+    console.error('Error fetching opportunities from backend:', error);
+    if (onProgress) {
+      onProgress(0, 'Erro na conexão');
+    }
+    throw error;
+  }
+};
+
+export const fetchPairDetails = async (pairId: string): Promise<DetailedOpportunity> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/pair/${pairId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pair details: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error fetching details for pair ${pairId}:`, error);
+    throw error;
+  }
+};
+
+export const triggerRecalculation = async (): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/recalculate`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to trigger recalculation: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('Error triggering recalculation:', error);
+    throw error;
+  }
+};
