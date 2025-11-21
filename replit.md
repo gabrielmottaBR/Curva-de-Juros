@@ -6,7 +6,18 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection.
 
 ## Recent Changes
-- **2025-11-20 (Latest Session - Backfill Update):** Backfill completed with market-based realistic data
+- **2025-11-21 (Latest Session - 100% Vercel Deployment):** Migrated entire backend to Vercel serverless functions
+  - Converted Express backend to individual Vercel serverless functions (CommonJS)
+  - Created `api/_shared.js` for Supabase client and CORS utilities
+  - Separated endpoints: `health.js`, `opportunities.js`, `pair/[pairId].js`, `recalculate.js`, `collect.js`
+  - Fixed CommonJS/ES Module conflict by adding `api/package.json` with `"type": "commonjs"`
+  - Configured `vercel.json` with cron job and 60s maxDuration for collect function
+  - Successfully deployed to https://curvadejuros.vercel.app
+  - Validated 43 opportunities in production database
+  - Removed old Express server code (`/server` directory)
+  - System now 100% serverless on Vercel platform
+
+- **2025-11-20 (Earlier - Backfill Update):** Backfill completed with market-based realistic data
   - Updated contracts to 9: DI1F27, DI1F28, DI1F29, DI1F30, DI1F31, DI1F32, DI1F33, DI1F34, DI1F35
   - Populated 900 records (100 business days × 9 contracts) from 03/07/2025 to 19/11/2025
   - Generated 43 arbitrage opportunities (up from 10 with 5 contracts)
@@ -58,14 +69,14 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - **Icons:** Lucide React
 - **Dev Server:** Port 5000 on 0.0.0.0
 
-**Backend:**
-- **Server:** Express 5.1.0
-- **Runtime:** Node.js with tsx
-- **Language:** TypeScript 5.8.2
+**Backend (Vercel Serverless):**
+- **Platform:** Vercel Serverless Functions
+- **Runtime:** Node.js 20.x
+- **Language:** JavaScript (CommonJS)
 - **Database:** Supabase (PostgreSQL)
 - **Scraping:** JSDOM 27.2.0
-- **Scheduling:** node-cron 4.2.1
-- **API Port:** 3000
+- **Scheduling:** Vercel Cron Jobs (requires Pro plan)
+- **Deployment:** https://curvadejuros.vercel.app
 
 ### Project Structure
 **Frontend:**
@@ -76,17 +87,16 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - `types.ts` - TypeScript type definitions
 - `constants.ts` - Application constants
 
-**Backend:**
-- `/server/index.ts` - Express server entry point
-- `/server/api/opportunities.ts` - REST API routes
-- `/server/collectors/b3Scraper.ts` - B3 data scraping logic
-- `/server/analyzers/opportunityScanner.ts` - Statistical analysis engine
-- `/server/analyzers/riskCalculator.ts` - Financial calculations (PU, DV01, hedge ratios)
-- `/server/jobs/initialPopulation.ts` - Initial database population (100 days)
-- `/server/jobs/dailyCollection.ts` - Automated daily data collection (21:00 cron)
-- `/server/config/supabase.ts` - Supabase client configuration
-- `/server/utils/` - Business days, date formatting, math utilities
-- `/server/database/schema.sql` - Database schema (di1_prices, opportunities_cache)
+**Backend (Vercel Serverless API):**
+- `/api/_shared.js` - Shared utilities (Supabase client, CORS headers)
+- `/api/health.js` - Health check endpoint (GET /api/health)
+- `/api/opportunities.js` - List opportunities (GET /api/opportunities)
+- `/api/pair/[pairId].js` - Pair details with dynamic routing (GET /api/pair/:id)
+- `/api/recalculate.js` - Manual recalculation trigger (POST /api/recalculate)
+- `/api/collect.js` - Data collection pipeline with B3 scraping, analysis, and caching
+- `/api/utils.js` - Business days, date formatting, financial calculations (PU, DV01, z-score, cointegration)
+- `/api/package.json` - CommonJS configuration for serverless functions
+- `vercel.json` - Vercel deployment configuration (cron, maxDuration)
 
 ### Key Features
 1. **Automated Data Collection:** Daily scraping at 21:00 (Brasília time) on business days
@@ -101,8 +111,9 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ### Data Flow
 ```
-B3 API → Backend Scraper → Supabase Database → Backend Analyzer → Frontend Display
-         (cron 21:00)       (di1_prices)        (opportunities_cache)
+B3 API → Vercel Serverless (collect.js) → Supabase Database → Vercel API → Frontend Display
+         (cron 0:00 UTC daily)             (di1_prices)         (JSON)
+                                           (opportunities_cache)
 ```
 
 ### External Dependencies

@@ -1,6 +1,7 @@
 import { Opportunity } from '../types';
 
-const API_BASE_URL = '/api';
+// Use Vercel API directly (backend is 100% serverless now)
+const API_BASE_URL = 'https://curvadejuros.vercel.app/api';
 
 export interface ScanResult {
   opportunities: Opportunity[];
