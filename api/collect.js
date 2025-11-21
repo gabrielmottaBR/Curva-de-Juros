@@ -1,6 +1,20 @@
-// api/collect.js - Data Collection Endpoint (Vercel Cron compatible)
+// api/collect.js - Data Collection Endpoint (Vercel serverless)
+// Ported from server/jobs/dailyCollection.ts + opportunityScanner.ts + riskCalculator.ts
+
 const { createClient } = require('@supabase/supabase-js');
 const { JSDOM } = require('jsdom');
+const {
+  AVAILABLE_MATURITIES,
+  calculatePU,
+  calculateDV01,
+  calculateMean,
+  calculateStdDev,
+  calculateZScore,
+  checkCointegration,
+  isBusinessDay,
+  formatDateISO,
+  formatDateForB3
+} = require('./utils');
 
 // Initialize Supabase
 const supabase = createClient(
@@ -8,232 +22,359 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 );
 
-// DI1 Contracts
-const CONTRACTS = [
-  'DI1F27', 'DI1F28', 'DI1F29', 'DI1F30', 'DI1F31',
-  'DI1F32', 'DI1F33', 'DI1F34', 'DI1F35'
-];
+// B3 Scraper
+const B3_BASE_URL = 'https://www2.bmf.com.br/pages/portal/bmfbovespa/boletim1/SistemaPregao1.asp';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
-// Scrape B3 data
-async function scrapeB3Data() {
+const fetchB3DailyRates = async (date) => {
+  const dateStr = formatDateForB3(date);
+  const cacheBuster = `&_t=${new Date().getTime()}`;
+  const encodedUrl = encodeURIComponent(
+    `${B3_BASE_URL}?pagetype=pop&caminho=Resumo%20Estat%EDstico%20-%20Sistema%20Preg%E3o&Data=${dateStr}&Mercadoria=DI1`
+  );
+  
   try {
-    const prices = {};
-    
-    for (const contract of CONTRACTS) {
-      const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(
-        `https://sistemaswebb3-listados.b3.com.br/indexProxy/indexCall/GetPortfolioDay/${contract}`
-      )}`;
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.warn(`Failed to fetch ${contract}: ${response.status}`);
-        continue;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(`${CORS_PROXY}${encodedUrl}${cacheBuster}`, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn(`B3 fetch failed for ${dateStr}: HTTP ${response.status}`);
+      return null;
+    }
+    
+    const htmlText = await response.text();
+    const dom = new JSDOM(htmlText);
+    const doc = dom.window.document;
+    
+    const rates = {};
+    const rows = Array.from(doc.querySelectorAll('tr'));
+
+    for (const row of rows) {
+      const cells = Array.from(row.querySelectorAll('td'));
+      if (cells.length < 3) continue;
+
+      const cellTexts = cells.map(c => c.textContent?.trim() || '');
       
-      const html = await response.text();
-      const dom = new JSDOM(html);
-      const doc = dom.window.document;
-      
-      const priceCell = doc.querySelector('td[headers="closePrice"]');
-      if (priceCell) {
-        const priceText = priceCell.textContent.trim().replace(/\./g, '').replace(',', '.');
-        prices[contract] = parseFloat(priceText);
+      let ticker = '';
+      let rate = 0;
+      let found = false;
+
+      for (let i = 0; i < cellTexts.length; i++) {
+        const text = cellTexts[i];
+        if (/^(DI1)?F\d{2}$/.test(text)) {
+          ticker = text.startsWith('DI1') ? text : `DI1${text}`;
+          for (let j = 1; j <= 4; j++) {
+            const potentialRate = cellTexts[i + j];
+            if (potentialRate && /^\d{1,3},\d{1,4}$/.test(potentialRate)) {
+              rate = parseFloat(potentialRate.replace(',', '.'));
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) break;
+      }
+
+      if (found && ticker && rate > 0) {
+        rates[ticker] = rate;
       }
     }
     
-    return prices;
+    return Object.keys(rates).length > 0 ? rates : null;
+
   } catch (error) {
-    console.error('Error scraping B3:', error);
+    console.error(`Error fetching B3 data for ${dateStr}:`, error instanceof Error ? error.message : 'Unknown error');
     return null;
   }
-}
+};
 
-// Calculate PU from price
-function calculatePU(price, yearsToMaturity = 1) {
-  return 100000 / Math.pow(price / 100000, 1 / yearsToMaturity);
-}
-
-// Calculate DV01
-function calculateDV01(pu, yearsToMaturity) {
-  const rate = (100000 / pu) ** (1 / yearsToMaturity) - 1;
-  return (yearsToMaturity * 100000 * Math.exp(-rate * yearsToMaturity)) / 10000;
-}
-
-// Save prices to database
-async function savePrices(prices) {
-  const timestamp = new Date().toISOString();
-  const records = [];
-  
-  for (const [contract, price] of Object.entries(prices)) {
-    records.push({
-      contract_id: contract,
-      price: price,
-      timestamp: timestamp
-    });
-  }
-  
-  const { error } = await supabase
+// Get historical data from database
+const getHistoricalDataFromDB = async (contractCode, days = 100) => {
+  const { data, error } = await supabase
     .from('di1_prices')
-    .insert(records);
-    
+    .select('date, rate')
+    .eq('contract_code', contractCode)
+    .order('date', { ascending: false })
+    .limit(days);
+
   if (error) {
-    console.error('Error saving prices:', error);
-    throw error;
+    console.error(`Error fetching historical data for ${contractCode}:`, error);
+    return [];
   }
-  
-  return records.length;
-}
 
-// Analyze opportunities
-async function analyzeOpportunities() {
-  // Fetch recent prices (last 100 business days)
-  const { data: prices, error } = await supabase
-    .from('di1_prices')
-    .select('*')
-    .order('timestamp', { ascending: false })
-    .limit(CONTRACTS.length * 100);
-    
-  if (error || !prices || prices.length === 0) {
-    throw new Error('No price data available');
-  }
-  
-  // Group by timestamp
-  const pricesByDate = {};
-  prices.forEach(p => {
-    if (!pricesByDate[p.timestamp]) {
-      pricesByDate[p.timestamp] = {};
-    }
-    pricesByDate[p.timestamp][p.contract_id] = p.price;
-  });
-  
-  const dates = Object.keys(pricesByDate).sort().reverse();
+  const records = (data || []).map(row => ({
+    date: row.date,
+    rate: row.rate
+  }));
+
+  return records.reverse();
+};
+
+// Scan opportunities
+const scanOpportunities = async () => {
   const opportunities = [];
   
-  // Analyze all pairs
-  for (let i = 0; i < CONTRACTS.length; i++) {
-    for (let j = i + 1; j < CONTRACTS.length; j++) {
-      const shortContract = CONTRACTS[i];
-      const longContract = CONTRACTS[j];
-      
-      const spreads = [];
-      const historicalData = [];
-      
-      // Calculate historical spreads
-      for (const date of dates) {
-        const dayPrices = pricesByDate[date];
-        if (dayPrices[shortContract] && dayPrices[longContract]) {
-          const spread = dayPrices[shortContract] - dayPrices[longContract];
-          spreads.push(spread);
-          historicalData.push({
-            date,
-            spread,
-            shortPrice: dayPrices[shortContract],
-            longPrice: dayPrices[longContract]
-          });
-        }
+  for (let i = 0; i < AVAILABLE_MATURITIES.length; i++) {
+    for (let j = i + 1; j < AVAILABLE_MATURITIES.length; j++) {
+      const short = AVAILABLE_MATURITIES[i];
+      const long = AVAILABLE_MATURITIES[j];
+
+      const shortSeries = await getHistoricalDataFromDB(short.id, 100);
+      const longSeries = await getHistoricalDataFromDB(long.id, 100);
+
+      if (shortSeries.length === 0 || longSeries.length === 0) {
+        console.warn(`No data for pair ${short.id} - ${long.id}`);
+        continue;
       }
+
+      const combinedHistory = [];
+      const minLen = Math.min(shortSeries.length, longSeries.length);
       
-      if (spreads.length < 20) continue; // Need enough data
-      
-      // Calculate statistics
-      const currentSpread = spreads[0];
-      const mean = spreads.reduce((a, b) => a + b, 0) / spreads.length;
-      const variance = spreads.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / spreads.length;
-      const stdDev = Math.sqrt(variance);
-      const zScore = (currentSpread - mean) / stdDev;
-      
-      // Calculate risk metrics (years to maturity)
-      const currentYear = new Date().getFullYear();
-      const shortMaturityYear = 2000 + parseInt(shortContract.substring(4));
-      const longMaturityYear = 2000 + parseInt(longContract.substring(4));
-      const shortMaturity = shortMaturityYear - currentYear;
-      const longMaturity = longMaturityYear - currentYear;
-      const shortPrice = historicalData[0].shortPrice;
-      const longPrice = historicalData[0].longPrice;
-      
-      const puShort = calculatePU(shortPrice, shortMaturity);
-      const puLong = calculatePU(longPrice, longMaturity);
-      const dv01Short = calculateDV01(puShort, shortMaturity);
-      const dv01Long = calculateDV01(puLong, longMaturity);
-      const hedgeRatio = dv01Short / dv01Long;
-      
-      // Determine recommendation
-      let recommendation = 'HOLD';
-      if (Math.abs(zScore) > 2) {
-        recommendation = zScore > 0 ? 'SHORT_SPREAD' : 'LONG_SPREAD';
+      for (let k = 0; k < minLen; k++) {
+        const sRate = shortSeries[k].rate;
+        const lRate = longSeries[k].rate;
+        
+        combinedHistory.push({
+          date: shortSeries[k].date,
+          shortRate: sRate,
+          longRate: lRate,
+          spread: parseFloat((lRate - sRate).toFixed(2))
+        });
       }
-      
+
+      if (combinedHistory.length < 10) {
+        console.warn(`Insufficient data for pair ${short.id} - ${long.id}: only ${combinedHistory.length} points`);
+        continue;
+      }
+
+      const spreads = combinedHistory.map(d => d.spread);
+      const mean = calculateMean(spreads);
+      const stdDev = calculateStdDev(spreads, mean);
+      const currentSpread = spreads[spreads.length - 1];
+      const zScore = calculateZScore(currentSpread, mean, stdDev);
+
+      let recommendation = 'NEUTRAL';
+      if (zScore < -1.5) recommendation = 'BUY SPREAD';
+      if (zScore > 1.5) recommendation = 'SELL SPREAD';
+
       opportunities.push({
-        pair_id: `${shortContract}_${longContract}`,
-        short_id: shortContract,
-        long_id: longContract,
-        short_label: `DI ${shortContract.substring(3, 5)}`,
-        long_label: `DI ${longContract.substring(3, 5)}`,
-        z_score: zScore,
-        current_spread: currentSpread,
-        mean_spread: mean,
-        std_dev_spread: stdDev,
-        cointegration_p_value: 0.05, // Simplified
-        recommendation: recommendation,
-        calculated_at: new Date().toISOString(),
-        details_json: JSON.stringify({
-          historicalData: historicalData.slice(0, 100),
-          puShort,
-          puLong,
-          dv01Short,
-          dv01Long,
-          hedgeRatio
-        })
+        id: `${short.id}-${long.id}`,
+        shortId: short.id,
+        longId: long.id,
+        shortLabel: short.label.split(' ')[2].replace('(', '').replace(')', ''),
+        longLabel: long.label.split(' ')[2].replace('(', '').replace(')', ''),
+        zScore,
+        currentSpread,
+        recommendation,
+        historicalData: combinedHistory
       });
     }
   }
+
+  return opportunities.sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore));
+};
+
+// Calculate detailed metrics
+const calculateDetailedMetrics = (opp) => {
+  const spreads = opp.historicalData.map(d => d.spread);
+  const meanSpread = calculateMean(spreads);
+  const stdDevSpread = calculateStdDev(spreads, meanSpread);
   
-  // Save opportunities
-  await supabase
-    .from('opportunities_cache')
-    .delete()
-    .neq('pair_id', '__NONE__'); // Delete all
+  const shorts = opp.historicalData.map(d => d.shortRate);
+  const longs = opp.historicalData.map(d => d.longRate);
+  const cointegrationPValue = checkCointegration(shorts, longs);
+
+  return {
+    meanSpread,
+    stdDevSpread,
+    cointegrationPValue
+  };
+};
+
+// Calculate risk metrics
+const calculateDetailedRisk = (opportunity) => {
+  const latest = opportunity.historicalData[opportunity.historicalData.length - 1];
+  const shortConfig = AVAILABLE_MATURITIES.find(m => m.id === opportunity.shortId);
+  const longConfig = AVAILABLE_MATURITIES.find(m => m.id === opportunity.longId);
+
+  const puShort = calculatePU(latest.shortRate, shortConfig.defaultDu);
+  const puLong = calculatePU(latest.longRate, longConfig.defaultDu);
+  const dv01Short = calculateDV01(latest.shortRate, shortConfig.defaultDu);
+  const dv01Long = calculateDV01(latest.longRate, longConfig.defaultDu);
+
+  const hedgeRatio = dv01Short === 0 ? 0 : dv01Long / dv01Short;
+
+  return {
+    puShort,
+    puLong,
+    dv01Short,
+    dv01Long,
+    hedgeRatio
+  };
+};
+
+// Recalculate opportunities
+const recalculateOpportunities = async () => {
+  console.log('[Collect] Recalculating opportunities...');
+
+  const opportunities = await scanOpportunities();
+  
+  if (opportunities.length === 0) {
+    console.warn('[Collect] No opportunities calculated.');
+    return 0;
+  }
+
+  const cacheRecords = [];
+  
+  for (const opp of opportunities) {
+    const metrics = calculateDetailedMetrics(opp);
     
-  const { error: insertError } = await supabase
-    .from('opportunities_cache')
-    .insert(opportunities);
+    const oppWithMetrics = {
+      ...opp,
+      ...metrics
+    };
     
-  if (insertError) {
-    throw insertError;
+    const riskMetrics = calculateDetailedRisk(oppWithMetrics);
+    
+    cacheRecords.push({
+      pair_id: opp.id,
+      short_id: opp.shortId,
+      long_id: opp.longId,
+      short_label: opp.shortLabel,
+      long_label: opp.longLabel,
+      z_score: opp.zScore,
+      current_spread: opp.currentSpread,
+      mean_spread: metrics.meanSpread,
+      std_dev_spread: metrics.stdDevSpread,
+      recommendation: opp.recommendation,
+      cointegration_p_value: metrics.cointegrationPValue,
+      calculated_at: new Date().toISOString(),
+      details_json: JSON.stringify({
+        historicalData: opp.historicalData,
+        meanSpread: metrics.meanSpread,
+        stdDevSpread: metrics.stdDevSpread,
+        cointegrationPValue: metrics.cointegrationPValue,
+        puShort: riskMetrics.puShort || 0,
+        puLong: riskMetrics.puLong || 0,
+        dv01Short: riskMetrics.dv01Short || 0,
+        dv01Long: riskMetrics.dv01Long || 0,
+        hedgeRatio: riskMetrics.hedgeRatio || 1
+      })
+    });
+  }
+
+  const { error } = await supabase
+    .from('opportunities_cache')
+    .upsert(cacheRecords, {
+      onConflict: 'pair_id',
+      ignoreDuplicates: false
+    });
+
+  if (error) {
+    console.error('[Collect] Error updating opportunities cache:', error);
+    throw error;
+  }
+
+  console.log(`[Collect] ✓ Updated ${cacheRecords.length} opportunities in cache`);
+  return cacheRecords.length;
+};
+
+// Collect daily data
+const collectDailyData = async () => {
+  const today = new Date();
+  
+  // Check if collection should start (21/11/2025)
+  const startDate = new Date('2025-11-21T00:00:00-03:00');
+  if (today < startDate) {
+    console.log(`[Collect] Scheduled start date is ${startDate.toLocaleDateString('pt-BR')}. Skipping collection.`);
+    return { skipped: true, reason: 'before_start_date' };
   }
   
-  return opportunities.length;
-}
+  // Check if business day
+  if (!isBusinessDay(today)) {
+    console.log('[Collect] Today is not a business day. Skipping data collection.');
+    return { skipped: true, reason: 'not_business_day' };
+  }
 
-// Main handler
+  console.log(`[Collect] Starting daily data collection for ${formatDateISO(today)}...`);
+
+  // Fetch rates from B3
+  const rates = await fetchB3DailyRates(today);
+  
+  if (!rates || Object.keys(rates).length === 0) {
+    console.warn('[Collect] No data available from B3. Skipping collection.');
+    return { skipped: true, reason: 'no_b3_data' };
+  }
+
+  // Prepare records
+  const records = [];
+  
+  for (const maturity of AVAILABLE_MATURITIES) {
+    const rate = rates[maturity.id];
+    if (rate && rate > 0) {
+      records.push({
+        contract_code: maturity.id,
+        date: formatDateISO(today),
+        rate: rate
+      });
+    }
+  }
+
+  // Insert into database
+  if (records.length > 0) {
+    const { error } = await supabase
+      .from('di1_prices')
+      .upsert(records, {
+        onConflict: 'contract_code,date',
+        ignoreDuplicates: false
+      });
+
+    if (error) {
+      console.error('[Collect] Error inserting daily data:', error);
+      throw error;
+    }
+
+    console.log(`[Collect] ✓ Inserted ${records.length} contracts for ${formatDateISO(today)}`);
+  }
+
+  // Recalculate opportunities
+  const opportunitiesCount = await recalculateOpportunities();
+
+  return {
+    skipped: false,
+    pricesCollected: records.length,
+    opportunitiesAnalyzed: opportunitiesCount
+  };
+};
+
+// Main handler (Vercel serverless function)
 module.exports = async (req, res) => {
   try {
-    console.log('[Collect] Starting data collection...');
+    console.log('[Collect] Data collection triggered');
     
-    // 1. Scrape B3 data
-    const prices = await scrapeB3Data();
+    const result = await collectDailyData();
     
-    if (!prices || Object.keys(prices).length === 0) {
-      console.warn('[Collect] No prices fetched from B3, using existing data');
+    if (result.skipped) {
       return res.status(200).json({
         success: true,
-        message: 'No new data from B3, using existing database records',
-        pricesCollected: 0
+        skipped: true,
+        reason: result.reason,
+        timestamp: new Date().toISOString()
       });
     }
-    
-    // 2. Save prices
-    const savedCount = await savePrices(prices);
-    console.log(`[Collect] Saved ${savedCount} prices`);
-    
-    // 3. Analyze opportunities
-    const opportunitiesCount = await analyzeOpportunities();
-    console.log(`[Collect] Analyzed ${opportunitiesCount} opportunities`);
     
     res.status(200).json({
       success: true,
-      pricesCollected: savedCount,
-      opportunitiesAnalyzed: opportunitiesCount,
+      pricesCollected: result.pricesCollected,
+      opportunitiesAnalyzed: result.opportunitiesAnalyzed,
       timestamp: new Date().toISOString()
     });
     
