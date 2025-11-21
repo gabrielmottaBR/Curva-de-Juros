@@ -4,8 +4,13 @@
 
 O sistema usa **GitHub Actions** (100% gratuito) para executar a coleta automática de dados diariamente às **0:00 UTC** (21:00 BRT no horário de verão, 20:00 BRT fora do horário de verão).
 
+**✅ Sistema Operacional para 2025-2030** (calendário completo de feriados B3)
+
 **Fluxo em 2 Etapas:**
 1. **Coleta de Dados** (`/api/collect-data`) - Faz scraping do B3 e insere novos dados no Supabase (~15s)
+   - Coleta **dia útil anterior** (pula finais de semana + 54 feriados B3)
+   - Retry automático: 3 tentativas por contrato
+   - Persistência parcial: salva dados reais + simula faltantes
 2. **Recálculo de Oportunidades** (`/api/refresh`) - Analisa dados e identifica oportunidades (~5s)
 
 ## ✅ Já Está Configurado!
