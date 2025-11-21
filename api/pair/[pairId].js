@@ -1,28 +1,24 @@
 // api/pair/[pairId].js - Get pair details
 
-const { createClient } = require('@supabase/supabase-js');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
-);
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../_shared');
 
 module.exports = async (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  setCorsHeaders(res);
+  if (handleOptions(req, res)) return;
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { pairId } = req.query;
+    // Extract pairId from query, params, or URL
+    const pairId = req.query?.pairId || req.params?.pairId || req.url?.split('/').pop();
+
+    if (!pairId) {
+      return res.status(400).json({ error: 'pairId is required' });
+    }
+
+    const supabase = getSupabaseClient();
 
     const { data, error } = await supabase
       .from('opportunities_cache')
@@ -60,7 +56,7 @@ module.exports = async (req, res) => {
     res.status(200).json(response);
 
   } catch (err) {
-    console.error('Unexpected error in GET /api/pair/:pairId:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Unexpected error in /api/pair/:pairId:', err);
+    res.status(500).json({ error: 'Internal server error', message: err.message });
   }
 };

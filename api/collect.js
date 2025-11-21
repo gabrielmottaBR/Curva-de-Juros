@@ -1,7 +1,7 @@
 // api/collect.js - Data Collection Endpoint (Vercel serverless)
 // Ported from server/jobs/dailyCollection.ts + opportunityScanner.ts + riskCalculator.ts
 
-const { createClient } = require('@supabase/supabase-js');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
 const { JSDOM } = require('jsdom');
 const {
   AVAILABLE_MATURITIES,
@@ -15,12 +15,6 @@ const {
   formatDateISO,
   formatDateForB3
 } = require('./utils');
-
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_KEY || ''
-);
 
 // B3 Scraper
 const B3_BASE_URL = 'https://www2.bmf.com.br/pages/portal/bmfbovespa/boletim1/SistemaPregao1.asp';
@@ -97,7 +91,7 @@ const fetchB3DailyRates = async (date) => {
 };
 
 // Get historical data from database
-const getHistoricalDataFromDB = async (contractCode, days = 100) => {
+const getHistoricalDataFromDB = async (supabase, contractCode, days = 100) => {
   const { data, error } = await supabase
     .from('di1_prices')
     .select('date, rate')
@@ -119,7 +113,7 @@ const getHistoricalDataFromDB = async (contractCode, days = 100) => {
 };
 
 // Scan opportunities
-const scanOpportunities = async () => {
+const scanOpportunities = async (supabase) => {
   const opportunities = [];
   
   for (let i = 0; i < AVAILABLE_MATURITIES.length; i++) {
@@ -127,8 +121,8 @@ const scanOpportunities = async () => {
       const short = AVAILABLE_MATURITIES[i];
       const long = AVAILABLE_MATURITIES[j];
 
-      const shortSeries = await getHistoricalDataFromDB(short.id, 100);
-      const longSeries = await getHistoricalDataFromDB(long.id, 100);
+      const shortSeries = await getHistoricalDataFromDB(supabase, short.id, 100);
+      const longSeries = await getHistoricalDataFromDB(supabase, long.id, 100);
 
       if (shortSeries.length === 0 || longSeries.length === 0) {
         console.warn(`No data for pair ${short.id} - ${long.id}`);
@@ -222,10 +216,10 @@ const calculateDetailedRisk = (opportunity) => {
 };
 
 // Recalculate opportunities
-const recalculateOpportunities = async () => {
+const recalculateOpportunities = async (supabase) => {
   console.log('[Collect] Recalculating opportunities...');
 
-  const opportunities = await scanOpportunities();
+  const opportunities = await scanOpportunities(supabase);
   
   if (opportunities.length === 0) {
     console.warn('[Collect] No opportunities calculated.');
@@ -288,7 +282,7 @@ const recalculateOpportunities = async () => {
 };
 
 // Collect daily data
-const collectDailyData = async () => {
+const collectDailyData = async (supabase) => {
   const today = new Date();
   
   // Check if collection should start (21/11/2025)
@@ -346,7 +340,7 @@ const collectDailyData = async () => {
   }
 
   // Recalculate opportunities
-  const opportunitiesCount = await recalculateOpportunities();
+  const opportunitiesCount = await recalculateOpportunities(supabase);
 
   return {
     skipped: false,
@@ -357,10 +351,14 @@ const collectDailyData = async () => {
 
 // Main handler (Vercel serverless function)
 module.exports = async (req, res) => {
+  setCorsHeaders(res);
+  if (handleOptions(req, res)) return;
+
   try {
     console.log('[Collect] Data collection triggered');
     
-    const result = await collectDailyData();
+    const supabase = getSupabaseClient();
+    const result = await collectDailyData(supabase);
     
     if (result.skipped) {
       return res.status(200).json({
