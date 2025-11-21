@@ -45,9 +45,34 @@ CREATE INDEX IF NOT EXISTS idx_opportunities_pair ON opportunities_cache(pair_id
 -- Index for filtering by recommendation
 CREATE INDEX IF NOT EXISTS idx_opportunities_recommendation ON opportunities_cache(recommendation);
 
+-- Table: import_metadata
+-- Stores audit trail of data imports for reproducibility and validation
+CREATE TABLE IF NOT EXISTS import_metadata (
+  id SERIAL PRIMARY KEY,
+  source_type VARCHAR(50) NOT NULL, -- 'rb3_csv', 'bdi_csv', 'simulated', etc.
+  source_file VARCHAR(255), -- Original filename or URL
+  import_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  records_raw INTEGER, -- Total records in source (before deduplication)
+  records_unique INTEGER, -- Unique records after deduplication
+  records_imported INTEGER, -- Records successfully imported to di1_prices
+  date_range_start DATE,
+  date_range_end DATE,
+  contracts_count INTEGER,
+  contracts_list TEXT, -- Comma-separated list of contract codes
+  rate_min NUMERIC(10, 4),
+  rate_max NUMERIC(10, 4),
+  dedup_strategy VARCHAR(100), -- 'average', 'last', etc.
+  notes TEXT
+);
+
+-- Index for querying recent imports
+CREATE INDEX IF NOT EXISTS idx_import_metadata_timestamp ON import_metadata(import_timestamp DESC);
+
 -- Comments for documentation
 COMMENT ON TABLE di1_prices IS 'Historical daily rates for DI1 futures contracts from B3';
 COMMENT ON TABLE opportunities_cache IS 'Pre-calculated spread arbitrage opportunities with statistical analysis';
+COMMENT ON TABLE import_metadata IS 'Audit trail of data imports for reproducibility and validation';
 COMMENT ON COLUMN di1_prices.rate IS 'Implied annual interest rate in percentage (e.g., 11.25 for 11.25%)';
 COMMENT ON COLUMN opportunities_cache.z_score IS 'Statistical z-score indicating how far current spread deviates from mean';
 COMMENT ON COLUMN opportunities_cache.details_json IS 'JSON string containing historical data, PU values, DV01, and hedge ratios';
+COMMENT ON COLUMN import_metadata.dedup_strategy IS 'Strategy used to handle duplicate (date, contract) pairs: average, last, first, etc.';

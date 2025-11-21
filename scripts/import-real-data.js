@@ -156,10 +156,10 @@ async function clearSimulatedData() {
 }
 
 /**
- * Import real data in batches
+ * Import real data in batches (IDEMPOTENT via UPSERT)
  */
 async function importRealData(records) {
-  console.log('\n📥 Step 2: Importing real B3 data...');
+  console.log('\n📥 Step 2: Importing real B3 data (UPSERT mode - safe to re-run)...');
   console.log(`   Total records to import: ${records.length}`);
   
   const BATCH_SIZE = 500;
@@ -171,16 +171,20 @@ async function importRealData(records) {
   
   console.log(`   Batches: ${batches.length} (${BATCH_SIZE} records per batch)`);
   
-  let totalInserted = 0;
+  let totalUpserted = 0;
   
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     
-    console.log(`   📦 Batch ${i + 1}/${batches.length}: Inserting ${batch.length} records...`);
+    console.log(`   📦 Batch ${i + 1}/${batches.length}: Upserting ${batch.length} records...`);
     
+    // UPSERT: inserts new records or updates existing ones (idempotent)
     const { data, error } = await supabase
       .from('di1_prices')
-      .insert(batch)
+      .upsert(batch, {
+        onConflict: 'contract_code,date',
+        ignoreDuplicates: false // Update existing records
+      })
       .select();
     
     if (error) {
@@ -188,12 +192,12 @@ async function importRealData(records) {
       throw error;
     }
     
-    totalInserted += data.length;
-    console.log(`   ✅ Inserted ${data.length} records (cumulative: ${totalInserted})`);
+    totalUpserted += batch.length;
+    console.log(`   ✅ Upserted ${batch.length} records (cumulative: ${totalUpserted})`);
   }
   
-  console.log(`\n✅ Successfully imported ${totalInserted} records!`);
-  return totalInserted;
+  console.log(`\n✅ Successfully upserted ${totalUpserted} records!`);
+  return totalUpserted;
 }
 
 /**
@@ -261,11 +265,55 @@ async function validateImport(expectedCount) {
     .order('rate', { ascending: false })
     .limit(1);
   
+  const validationData = {
+    dateMin: dateRange?.[0]?.date || null,
+    dateMax: dateRangeMax?.[0]?.date || null,
+    contractsCount: contracts ? [...new Set(contracts.map(c => c.contract_code))].length : 0,
+    contracts: contracts ? [...new Set(contracts.map(c => c.contract_code))].join(', ') : '',
+    rateMin: rates?.[0]?.rate || null,
+    rateMax: ratesMax?.[0]?.rate || null
+  };
+  
   if (!ratesError && !ratesErrorMax && rates && ratesMax) {
     console.log(`   Rate range: ${rates[0]?.rate.toFixed(4)}% to ${ratesMax[0]?.rate.toFixed(4)}%`);
   }
   
   console.log('\n✅ Validation complete!');
+  
+  return validationData;
+}
+
+/**
+ * Save import metadata for audit trail
+ */
+async function saveImportMetadata(rawCount, uniqueCount, importedCount, validationData) {
+  console.log('\n📝 Step 4: Saving import metadata for audit trail...');
+  
+  const metadata = {
+    source_type: 'rb3_csv',
+    source_file: 'attached_assets/b3_backfill_real_data.csv',
+    records_raw: rawCount,
+    records_unique: uniqueCount,
+    records_imported: importedCount,
+    date_range_start: validationData.dateMin || null,
+    date_range_end: validationData.dateMax || null,
+    contracts_count: validationData.contractsCount || 0,
+    contracts_list: validationData.contracts || '',
+    rate_min: validationData.rateMin || null,
+    rate_max: validationData.rateMax || null,
+    dedup_strategy: 'average',
+    notes: `Real B3 data imported from rb3 R package. Deduplication: ${rawCount} raw records → ${uniqueCount} unique by averaging duplicate (date, contract) pairs.`
+  };
+  
+  const { error } = await supabase
+    .from('import_metadata')
+    .insert(metadata);
+  
+  if (error) {
+    console.warn('   ⚠️  Could not save metadata:', error.message);
+  } else {
+    console.log('   ✅ Import metadata saved successfully');
+  }
 }
 
 /**
@@ -276,24 +324,35 @@ async function main() {
   console.log('🇧🇷  B3 Real Data Import - Curva de Juros');
   console.log('═══════════════════════════════════════════════════════\n');
   
+  let rawRecordCount = 0;
+  let uniqueRecordCount = 0;
+  
   try {
     // Read and parse CSV
     const csvPath = path.join(__dirname, '..', 'attached_assets', 'b3_backfill_real_data.csv');
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const lines = csvContent.trim().split('\n');
+    rawRecordCount = lines.length - 1; // Exclude header
+    
     const records = parseCSV(csvPath);
+    uniqueRecordCount = records.length;
     
     if (records.length === 0) {
       console.error('❌ No records to import!');
       process.exit(1);
     }
     
-    // Clear existing data
-    await clearSimulatedData();
+    // REMOVED clearSimulatedData() - UPSERT handles overwriting existing data safely
+    // No need to delete first since UPSERT is atomic and won't leave DB empty on failure
     
-    // Import real data
+    // Import real data (UPSERT mode - overwrites existing records)
     const insertedCount = await importRealData(records);
     
-    // Validate import
-    await validateImport(insertedCount);
+    // Validate import and collect metadata
+    const validationData = await validateImport(insertedCount);
+    
+    // Save import metadata for audit trail
+    await saveImportMetadata(rawRecordCount, uniqueRecordCount, insertedCount, validationData);
     
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('✅ SUCCESS! Real B3 data has been imported');

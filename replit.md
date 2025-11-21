@@ -6,7 +6,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection. **System now uses 100% real B3 data collected via rb3 R package.**
 
 ## Recent Changes
-- **2025-11-21 (Latest Session - REAL B3 DATA BACKFILL COMPLETED):** Successfully replaced simulated data with 100% real B3 historical data
+- **2025-11-21 (Latest Session - PRODUCTION-READY REAL B3 DATA BACKFILL):** Successfully replaced simulated data with 100% real B3 historical data + production safety improvements
   - ✅ Created `scripts/import-real-data.js` for importing rb3 CSV data into Supabase
   - ✅ User executed R script locally using rb3 package to collect real B3 data
   - ✅ Imported **963 unique records** (2025-06-24 to 2025-11-19, ~107 business days)
@@ -16,7 +16,16 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
   - ✅ Recalculated opportunities: **36 arbitrage opportunities** identified from real data
   - ✅ System validated: GET /api/opportunities confirms all 36 opportunities working
   - ✅ Saved raw CSV in `attached_assets/b3_backfill_real_data.csv` for reference
-  - **System now 100% operational with REAL B3 data instead of simulated data**
+  - **Production Safety Improvements (Post-Architect Review):**
+    - ✅ **Idempotent Import:** Changed from INSERT to UPSERT - safe to re-run multiple times
+    - ✅ **Audit Trail:** Created `import_metadata` table to track all imports with full metadata
+    - ✅ **Atomicity:** Removed clearSimulatedData() - UPSERT is atomic, no risk of empty DB
+    - ✅ **Deleted Simulated Endpoints:** Removed api/collect-simple.js and api/collect-data.js completely
+    - ✅ **Automated Validation:** Created `scripts/validate-real-data.js` to prevent simulated data
+    - ✅ **Operational Docs:** Created `IMPORT_GUIDE.md` with complete import/validation procedures
+    - ✅ **Safety Docs:** Created `SIMULATED_ENDPOINTS_WARNING.md` documenting deleted endpoints
+    - ✅ **Reproducibility:** All imports logged with source, counts, date ranges, dedup strategy
+  - **System now 100% PRODUCTION-READY with REAL B3 data**
   - **Future enhancement: Automate daily collection via BDI CSV parser (2-3 hours implementation)**
 
 - **2025-11-21 (Earlier - DATA SOURCE RESEARCH):** Investigated B3 real data integration
