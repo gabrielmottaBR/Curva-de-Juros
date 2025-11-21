@@ -26,7 +26,10 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
     - ✅ **Safety Docs:** Created `SIMULATED_ENDPOINTS_WARNING.md` documenting deleted endpoints
     - ✅ **Reproducibility:** All imports logged with source, counts, date ranges, dedup strategy
   - **System now 100% PRODUCTION-READY with REAL B3 data**
-  - **Future enhancement: Automate daily collection via BDI CSV parser (2-3 hours implementation)**
+  - **Automated collection removed:** Previous GitHub Actions workflow called deleted simulated endpoints
+  - **Current workflow:** Manual data updates via `scripts/import-real-data.cjs` when needed
+  - **Future enhancement:** Implement BDI CSV parser for automated collection (~2-3 hours)
+  - **Documentation:** Created `DATA_UPDATE_GUIDE.md` for manual update workflow
 
 - **2025-11-21 (Earlier - DATA SOURCE RESEARCH):** Investigated B3 real data integration
   - HTML scraping NOT viable (SistemaPregao1.asp is interactive form, no static data)
@@ -34,16 +37,12 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
   - Documented viable alternatives in B3_DATA_SOURCES.md
   - Decision: Use rb3 R package for one-time backfill (completed above)
 
-- **2025-11-21 (Earlier - SYSTEM 100% OPERATIONAL):** Completed automated daily data collection system
-  - Implemented B3 holiday calendar 2025-2030 (54 holidays: 9 fixed + 4 movable per year)
-  - Fixed timing: collects previous business day (B3 data published after 18:00, collection at 21:00 BRT)
-  - Created simplified collection endpoint (`/api/collect-simple.js`) using simulated data
-  - Fixed calculateStdDev bug in refresh.js (missing mean parameter)
-  - Configured GitHub Actions workflow for 100% free automated daily execution
-  - Multi-level retry: 3 retries per step with exponential backoff
-  - Holiday-aware: automatically skips weekends + all B3 holidays
-  - **✅ System fully deployed and running automatically**
-  - **✅ 36 arbitrage opportunities being tracked**
+- **2025-11-21 (Earlier - AUTOMATED COLLECTION DEPRECATED):** GitHub Actions cron removed after switching to real data
+  - Previous workflow called `/api/collect-data` and `/api/collect-simple.js` (now deleted - generated simulated data)
+  - System now uses manual data imports via `scripts/import-real-data.cjs` (rb3 CSV backfill)
+  - Future enhancement: Implement BDI CSV parser for automated daily collection (~2-3 hours)
+  - **✅ System fully operational with manual data updates**
+  - **✅ 36 arbitrage opportunities tracked from real B3 data**
   - **✅ Frontend live at https://curvadejuros.vercel.app**
 
 - **2025-11-21 (Earlier - 100% Vercel Deployment):** Migrated entire backend to Vercel serverless functions
@@ -118,7 +117,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - **Language:** JavaScript (CommonJS)
 - **Database:** Supabase (PostgreSQL)
 - **Scraping:** JSDOM 27.2.0
-- **Scheduling:** GitHub Actions (free cron alternative)
+- **Data Updates:** Manual import via scripts (automated collection removed)
 - **Deployment:** https://curvadejuros.vercel.app
 
 ### Project Structure
@@ -135,17 +134,17 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - `/api/health.js` - Health check endpoint (GET /api/health)
 - `/api/opportunities.js` - List opportunities (GET /api/opportunities)
 - `/api/pair/[pairId].js` - Pair details with dynamic routing (GET /api/pair/:id)
-- `/api/collect-data.js` - **Daily data collection** from B3 (POST /api/collect-data) ~15s
 - `/api/refresh.js` - **Recalculate opportunities** from existing data (POST /api/refresh) ~5s
-- `/api/recalculate.js` - Full pipeline (collect + refresh, legacy) ~60s+
-- `/api/collect.js` - Legacy full pipeline (kept for reference)
+- `/api/recalculate.js` - Legacy full pipeline (kept for reference) ~60s+
+- `/api/collect.js` - Legacy endpoint (kept for reference)
 - `/api/utils.js` - Business days, date formatting, financial calculations (PU, DV01, z-score, cointegration)
 - `/api/package.json` - CommonJS configuration for serverless functions
 - `vercel.json` - Vercel deployment configuration (maxDuration)
-- `.github/workflows/daily-collect.yml` - GitHub Actions cron (free alternative to Vercel cron)
+- `scripts/import-real-data.cjs` - Manual import of rb3 CSV data to Supabase
+- `scripts/validate-real-data.cjs` - Automated validation to prevent simulated data
 
 ### Key Features
-1. **Automated Data Collection:** Daily scraping at 0:00 UTC (21:00 BRT) via GitHub Actions cron
+1. **Manual Data Updates:** Import real B3 data via `scripts/import-real-data.cjs` (rb3 CSV format)
 2. **Historical Database:** Persistent storage of DI1 prices in Supabase PostgreSQL
 3. **Pre-calculated Opportunities:** Backend processes all calculations and caches results
 4. **Live Market Data:** Fetches DI1 futures data from B3 using CORS proxy
@@ -157,13 +156,13 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ### Data Flow
 ```
-GitHub Actions (0:00 UTC daily)
+Manual Import (when needed)
    ↓
-   Step 1: POST /api/collect-data → B3 Scraping → Insert to Supabase (di1_prices)
+   Step 1: node scripts/import-real-data.cjs → rb3 CSV → UPSERT to Supabase (di1_prices)
    ↓
    Step 2: POST /api/refresh → Calculate Opportunities → Update Cache (opportunities_cache)
    ↓
-Frontend → GET /api/opportunities → Display 43 Opportunities
+Frontend → GET /api/opportunities → Display 36 Opportunities
 ```
 
 ### External Dependencies

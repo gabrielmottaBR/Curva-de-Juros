@@ -1,0 +1,2 @@
+⚠️ DESATUALIZADO - Os endpoints /api/collect-data e /api/collect-simple.js foram deletados (geravam dados simulados).
+Para reimplementar coleta automática, é necessário criar parser de BDI CSV do B3 (~2-3 horas).
