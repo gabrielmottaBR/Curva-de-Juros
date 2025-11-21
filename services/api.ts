@@ -1,8 +1,6 @@
 import { Opportunity } from '../types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL 
-  ? `${(import.meta as any).env.VITE_API_URL}/api`
-  : '/api';
+const API_BASE_URL = '/api';
 
 export interface ScanResult {
   opportunities: Opportunity[];
