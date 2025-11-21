@@ -76,6 +76,13 @@ export const recalculateOpportunities = async (): Promise<void> => {
   for (const opp of opportunities) {
     const metrics = calculateDetailedMetrics(opp);
     
+    const oppWithMetrics = {
+      ...opp,
+      ...metrics
+    };
+    
+    const riskMetrics = calculateDetailedRisk(oppWithMetrics);
+    
     cacheRecords.push({
       pair_id: opp.id,
       short_id: opp.shortId,
@@ -89,7 +96,15 @@ export const recalculateOpportunities = async (): Promise<void> => {
       recommendation: opp.recommendation,
       cointegration_p_value: metrics.cointegrationPValue,
       details_json: JSON.stringify({
-        historicalData: opp.historicalData
+        historicalData: opp.historicalData,
+        meanSpread: metrics.meanSpread,
+        stdDevSpread: metrics.stdDevSpread,
+        cointegrationPValue: metrics.cointegrationPValue,
+        puShort: riskMetrics.puShort || 0,
+        puLong: riskMetrics.puLong || 0,
+        dv01Short: riskMetrics.dv01Short || 0,
+        dv01Long: riskMetrics.dv01Long || 0,
+        hedgeRatio: riskMetrics.hedgeRatio || 1
       })
     });
   }
