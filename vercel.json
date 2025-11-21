@@ -3,9 +3,12 @@
   "outputDirectory": "dist",
   "functions": {
     "api/collect-data.js": {
-      "maxDuration": 20
+      "maxDuration": 60
     },
     "api/refresh.js": {
+      "maxDuration": 15
+    },
+    "api/test.js": {
       "maxDuration": 10
     }
   }

@@ -11,8 +11,8 @@ const {
 
 const B3_BASE_URL = 'https://www2.bmf.com.br/pages/portal/bmfbovespa/boletim1/SistemaPregao1.asp';
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 2000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1500;
 
 // Get last business day (B3 data published after market close)
 const getLastBusinessDay = (fromDate) => {
@@ -38,7 +38,7 @@ const fetchSingleContract = async (date, contractId, retries = MAX_RETRIES) => {
       );
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(`${CORS_PROXY}${encodedUrl}${cacheBuster}`, {
         signal: controller.signal,
