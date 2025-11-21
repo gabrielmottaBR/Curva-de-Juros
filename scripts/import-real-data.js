@@ -45,9 +45,15 @@ function parseCSV(filePath) {
   const records = [];
   let skipped = 0;
   
-  for (const line of dataLines) {
-    // Parse CSV line (handle quoted values)
-    const match = line.match(/^"?([^"]+)"?,"?([^"]+)"?,([0-9.]+)$/);
+  for (let line of dataLines) {
+    // Remove carriage return if present (Windows CRLF)
+    line = line.trim();
+    
+    if (!line) continue; // Skip empty lines
+    
+    // Parse CSV line: format is: 2025-06-24,"DI1F27",14.2426059864446
+    // Date has no quotes, contract_code has quotes, rate has no quotes
+    const match = line.match(/^([0-9-]+),"([^"]+)",([0-9.]+)$/);
     
     if (!match) {
       console.warn(`⚠️  Skipping malformed line: ${line.substring(0, 50)}...`);
@@ -71,8 +77,8 @@ function parseCSV(filePath) {
     }
     
     records.push({
-      date: date.replace(/"/g, ''),
-      contract_code: contractCode.replace(/"/g, ''),
+      date: date,
+      contract_code: contractCode,
       rate: rate
     });
   }
