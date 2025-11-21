@@ -64,18 +64,83 @@ const checkCointegration = (shortRates, longRates) => {
   return Number(pValueProxy.toFixed(3));
 };
 
-// B3 Trading Holidays 2025 (ISO format: YYYY-MM-DD)
-const B3_HOLIDAYS_2025 = [
-  '2025-01-01', // New Year's Day
-  '2025-03-03', // Carnival Monday
-  '2025-03-04', // Carnival Tuesday
-  '2025-04-18', // Good Friday
-  '2025-04-21', // Tiradentes' Day
-  '2025-05-01', // Labour Day
-  '2025-06-19', // Corpus Christi
-  '2025-11-20', // Black Consciousness Day
-  '2025-12-25'  // Christmas Day
-];
+// B3 Trading Holidays Multi-Year Calendar (2025-2030)
+// Fixed holidays (same every year)
+const B3_FIXED_HOLIDAYS = {
+  newYear: { month: 1, day: 1 },
+  tiradentes: { month: 4, day: 21 },
+  labourDay: { month: 5, day: 1 },
+  blackConsciousness: { month: 11, day: 20 },
+  christmas: { month: 12, day: 25 }
+};
+
+// Movable holidays (based on Easter) - calculated dates for 2025-2030
+const B3_MOVABLE_HOLIDAYS = {
+  2025: {
+    carnivalMonday: '2025-03-03',
+    carnivalTuesday: '2025-03-04',
+    goodFriday: '2025-04-18',
+    corpusChristi: '2025-06-19'
+  },
+  2026: {
+    carnivalMonday: '2026-02-16',
+    carnivalTuesday: '2026-02-17',
+    goodFriday: '2026-04-03',
+    corpusChristi: '2026-06-04'
+  },
+  2027: {
+    carnivalMonday: '2027-02-08',
+    carnivalTuesday: '2027-02-09',
+    goodFriday: '2027-03-26',
+    corpusChristi: '2027-05-27'
+  },
+  2028: {
+    carnivalMonday: '2028-02-28',
+    carnivalTuesday: '2028-02-29',
+    goodFriday: '2028-04-14',
+    corpusChristi: '2028-06-15'
+  },
+  2029: {
+    carnivalMonday: '2029-02-12',
+    carnivalTuesday: '2029-02-13',
+    goodFriday: '2029-03-30',
+    corpusChristi: '2029-05-31'
+  },
+  2030: {
+    carnivalMonday: '2030-03-04',
+    carnivalTuesday: '2030-03-05',
+    goodFriday: '2030-04-19',
+    corpusChristi: '2030-06-20'
+  }
+};
+
+// Generate complete holiday list for a given year
+const generateB3HolidaysForYear = (year) => {
+  const holidays = [];
+  
+  // Add fixed holidays
+  for (const holiday of Object.values(B3_FIXED_HOLIDAYS)) {
+    const dateStr = `${year}-${String(holiday.month).padStart(2, '0')}-${String(holiday.day).padStart(2, '0')}`;
+    holidays.push(dateStr);
+  }
+  
+  // Add movable holidays
+  const movableHolidays = B3_MOVABLE_HOLIDAYS[year];
+  if (movableHolidays) {
+    holidays.push(...Object.values(movableHolidays));
+  }
+  
+  return holidays;
+};
+
+// Generate complete holiday list for 2025-2030
+const B3_ALL_HOLIDAYS = (() => {
+  const allHolidays = [];
+  for (let year = 2025; year <= 2030; year++) {
+    allHolidays.push(...generateB3HolidaysForYear(year));
+  }
+  return allHolidays;
+})();
 
 // Business day functions
 const isWeekend = (date) => {
@@ -85,7 +150,7 @@ const isWeekend = (date) => {
 
 const isB3Holiday = (date) => {
   const dateStr = formatDateISO(date);
-  return B3_HOLIDAYS_2025.includes(dateStr);
+  return B3_ALL_HOLIDAYS.includes(dateStr);
 };
 
 const isBusinessDay = (date) => {
@@ -107,7 +172,8 @@ module.exports = {
   FACE_VALUE,
   DAYS_IN_YEAR,
   AVAILABLE_MATURITIES,
-  B3_HOLIDAYS_2025,
+  B3_ALL_HOLIDAYS,
+  generateB3HolidaysForYear,
   calculatePU,
   calculateDV01,
   calculateMean,
