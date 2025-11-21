@@ -16,6 +16,9 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
   - Validated 43 opportunities in production database
   - Removed old Express server code (`/server` directory)
   - System now 100% serverless on Vercel platform
+  - Configured GitHub Actions for free daily cron (0:00 UTC = 21:00 BRT)
+  - Created `.github/workflows/daily-collect.yml` for automated data collection
+  - Documentation in `CRON_SETUP.md` with setup and monitoring instructions
 
 - **2025-11-20 (Earlier - Backfill Update):** Backfill completed with market-based realistic data
   - Updated contracts to 9: DI1F27, DI1F28, DI1F29, DI1F30, DI1F31, DI1F32, DI1F33, DI1F34, DI1F35
@@ -75,7 +78,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - **Language:** JavaScript (CommonJS)
 - **Database:** Supabase (PostgreSQL)
 - **Scraping:** JSDOM 27.2.0
-- **Scheduling:** Vercel Cron Jobs (requires Pro plan)
+- **Scheduling:** GitHub Actions (free cron alternative)
 - **Deployment:** https://curvadejuros.vercel.app
 
 ### Project Structure
@@ -99,7 +102,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - `vercel.json` - Vercel deployment configuration (cron, maxDuration)
 
 ### Key Features
-1. **Automated Data Collection:** Daily scraping at 21:00 (Brasília time) on business days
+1. **Automated Data Collection:** Daily scraping at 0:00 UTC (21:00 BRT) via GitHub Actions cron
 2. **Historical Database:** Persistent storage of DI1 prices in Supabase PostgreSQL
 3. **Pre-calculated Opportunities:** Backend processes all calculations and caches results
 4. **Live Market Data:** Fetches DI1 futures data from B3 using CORS proxy
@@ -111,8 +114,10 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ### Data Flow
 ```
+GitHub Actions (0:00 UTC daily) → POST /api/recalculate
+                                   ↓
 B3 API → Vercel Serverless (collect.js) → Supabase Database → Vercel API → Frontend Display
-         (cron 0:00 UTC daily)             (di1_prices)         (JSON)
+                                           (di1_prices)         (JSON)
                                            (opportunities_cache)
 ```
 
