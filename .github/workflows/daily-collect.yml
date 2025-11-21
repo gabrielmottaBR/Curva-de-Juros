@@ -1,0 +1,44 @@
+name: Daily Data Collection
+
+# Runs every day at 0:00 UTC (21:00 BRT during DST, 20:00 BRT otherwise)
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  collect-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Vercel API data collection
+        run: |
+          echo "🚀 Triggering daily data collection..."
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://curvadejuros.vercel.app/api/recalculate)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "📊 HTTP Status: $http_code"
+          echo "📝 Response: $body"
+          
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Data collection completed successfully!"
+          else
+            echo "❌ Data collection failed with status $http_code"
+            exit 1
+          fi
+      
+      - name: Log completion
+        if: success()
+        run: |
+          echo "✅ Cron job completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+      
+      - name: Log failure
+        if: failure()
+        run: |
+          echo "❌ Cron job failed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
