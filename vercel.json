@@ -2,14 +2,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/collect.js": {
-      "maxDuration": 60
+    "api/collect-data.js": {
+      "maxDuration": 20
+    },
+    "api/refresh.js": {
+      "maxDuration": 10
     }
-  },
-  "crons": [
-    {
-      "path": "/api/collect",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  }
 }
