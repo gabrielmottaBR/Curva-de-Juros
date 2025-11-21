@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Trigger Vercel API data collection
+      - name: Trigger Vercel API data refresh
         run: |
-          echo "🚀 Triggering daily data collection..."
+          echo "🚀 Triggering daily data refresh..."
           
           response=$(curl -s -w "\n%{http_code}" -X POST \
-            https://curvadejuros.vercel.app/api/recalculate)
+            https://curvadejuros.vercel.app/api/refresh)
           
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
