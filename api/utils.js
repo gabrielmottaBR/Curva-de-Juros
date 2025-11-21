@@ -64,14 +64,32 @@ const checkCointegration = (shortRates, longRates) => {
   return Number(pValueProxy.toFixed(3));
 };
 
+// B3 Trading Holidays 2025 (ISO format: YYYY-MM-DD)
+const B3_HOLIDAYS_2025 = [
+  '2025-01-01', // New Year's Day
+  '2025-03-03', // Carnival Monday
+  '2025-03-04', // Carnival Tuesday
+  '2025-04-18', // Good Friday
+  '2025-04-21', // Tiradentes' Day
+  '2025-05-01', // Labour Day
+  '2025-06-19', // Corpus Christi
+  '2025-11-20', // Black Consciousness Day
+  '2025-12-25'  // Christmas Day
+];
+
 // Business day functions
 const isWeekend = (date) => {
   const day = date.getDay();
   return day === 0 || day === 6;
 };
 
+const isB3Holiday = (date) => {
+  const dateStr = formatDateISO(date);
+  return B3_HOLIDAYS_2025.includes(dateStr);
+};
+
 const isBusinessDay = (date) => {
-  return !isWeekend(date);
+  return !isWeekend(date) && !isB3Holiday(date);
 };
 
 const formatDateISO = (date) => {
@@ -89,6 +107,7 @@ module.exports = {
   FACE_VALUE,
   DAYS_IN_YEAR,
   AVAILABLE_MATURITIES,
+  B3_HOLIDAYS_2025,
   calculatePU,
   calculateDV01,
   calculateMean,
@@ -96,6 +115,7 @@ module.exports = {
   calculateZScore,
   checkCointegration,
   isWeekend,
+  isB3Holiday,
   isBusinessDay,
   formatDateISO,
   formatDateForB3
