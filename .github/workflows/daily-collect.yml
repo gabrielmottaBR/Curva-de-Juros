@@ -11,9 +11,12 @@ on:
 jobs:
   collect-and-analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     
     steps:
       - name: Step 1 - Collect data from B3
+        timeout-minutes: 2
+        continue-on-error: false
         run: |
           echo "📊 Step 1: Collecting data from B3..."
           
@@ -34,6 +37,8 @@ jobs:
           fi
       
       - name: Step 2 - Recalculate opportunities
+        timeout-minutes: 1
+        continue-on-error: false
         run: |
           echo "🔄 Step 2: Recalculating opportunities..."
           
