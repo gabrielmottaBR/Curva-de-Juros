@@ -113,17 +113,26 @@ app.get('/api/pair/:pairId', async (req, res) => {
   }
 });
 
-// Recalculate endpoint
+// Recalculate endpoint - triggers manual collection
 app.post('/api/recalculate', async (req, res) => {
   try {
-    res.json({ 
-      success: true, 
-      message: 'Manual recalculation not available in serverless mode',
-      note: 'Use Vercel Cron Jobs (Pro plan) for automated collection'
-    });
+    // Import and execute collector
+    const collectHandler = require('./collect');
+    await collectHandler(req, res);
   } catch (err) {
     console.error('Error in recalculate endpoint:', err);
     res.status(500).json({ error: 'Failed to recalculate opportunities' });
+  }
+});
+
+// Collect endpoint (for Vercel Cron and manual triggers)
+app.all('/api/collect', async (req, res) => {
+  try {
+    const collectHandler = require('./collect');
+    await collectHandler(req, res);
+  } catch (err) {
+    console.error('Error in collect endpoint:', err);
+    res.status(500).json({ error: 'Failed to collect data' });
   }
 });
 

@@ -20,9 +20,11 @@
 - ✅ Backend serverless escalável
 - ✅ HTTPS grátis
 
-**Limitações:**
-- ⚠️ **Cron jobs automáticos requerem Vercel Pro ($20/mês)**
-- ⚠️ No plano gratuito, coleta de dados precisa ser manual
+**Funcionalidades:**
+- ✅ Coleta de dados via `/api/collect`
+- ✅ Análise automática de oportunidades
+- ⚠️ **Cron jobs automáticos (21:00 diário) requerem Vercel Pro ($20/mês)**
+- ✅ No plano gratuito, coleta manual via endpoint `/api/collect`
 
 ---
 
@@ -113,34 +115,45 @@ Acesse: https://SEU-DOMINIO.vercel.app
 
 ### Atualizar Dados Manualmente (Plano Gratuito)
 
-Como o plano gratuito não suporta cron jobs, você precisa executar manualmente:
+Como o plano gratuito não suporta cron jobs, você pode executar coleta manual:
 
-**Opção 1: Via Replit (Recomendado)**
+**Opção 1: Via Endpoint (Recomendado)**
+```bash
+# Chamar o endpoint de coleta
+curl -X POST https://SEU-DOMINIO.vercel.app/api/collect
+
+# Ou através do navegador
+# https://SEU-DOMINIO.vercel.app/api/collect
+```
+
+**Opção 2: Automatizar com Serviço Externo Grátis**
+- **EasyCron** (https://www.easycron.com) - Plano gratuito permite 1 cron job
+- **cron-job.org** - Grátis, configure para chamar `/api/collect` diariamente
+- **IFTTT** ou **Zapier** - Automatize chamada diária
+
+**Opção 3: Via Replit (se mantiver projeto)**
 ```bash
 # No terminal do Replit, execute:
 tsx server/scripts/enhancedBackfill.ts
 ```
 
-**Opção 2: Criar endpoint de trigger**
-Você pode criar um endpoint `/api/collect` e chamá-lo manualmente ou via ferramenta externa (ex: EasyCron, IFTTT).
-
 ### Cron Jobs Automáticos (Vercel Pro - $20/mês)
 
-Se você atualizar para Vercel Pro, pode configurar cron jobs:
+**Já está configurado!** Se você atualizar para Vercel Pro:
 
-1. Criar arquivo `vercel.json` com:
-```json
-{
-  "crons": [
-    {
-      "path": "/api/collect",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
-```
+1. ✅ O arquivo `vercel.json` já tem a configuração de cron:
+   ```json
+   "crons": [{ "path": "/api/collect", "schedule": "0 0 * * *" }]
+   ```
 
-2. Criar endpoint `/api/collect.js` que chama a lógica de coleta
+2. ✅ O endpoint `/api/collect` já está implementado
+
+3. **Ajustar horário para 21:00 BRT:**
+   ```json
+   "schedule": "0 0 * * *"  // UTC (00:00 = 21:00 BRT)
+   ```
+
+Ao fazer upgrade para Pro, o cron job começará automaticamente!
 
 ---
 
