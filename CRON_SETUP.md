@@ -4,6 +4,10 @@
 
 O sistema usa **GitHub Actions** (100% gratuito) para executar a coleta automática de dados diariamente às **0:00 UTC** (21:00 BRT no horário de verão, 20:00 BRT fora do horário de verão).
 
+**Fluxo em 2 Etapas:**
+1. **Coleta de Dados** (`/api/collect-data`) - Faz scraping do B3 e insere novos dados no Supabase (~15s)
+2. **Recálculo de Oportunidades** (`/api/refresh`) - Analisa dados e identifica oportunidades (~5s)
+
 ## ✅ Já Está Configurado!
 
 O arquivo `.github/workflows/daily-collect.yml` já está criado e pronto para funcionar automaticamente quando você fizer push para o GitHub.
@@ -39,10 +43,15 @@ Para testar se está funcionando **antes** de esperar o cron diário:
 
 **✅ Resultado esperado:**
 ```
-🚀 Triggering daily data collection...
-📊 HTTP Status: 200
-📝 Response: {"success":true,...}
-✅ Data collection completed successfully!
+📊 Step 1: Collecting data from B3...
+HTTP Status: 200
+Response: {"success":true,"date":"2025-11-21","contractsCollected":9,"source":"b3"}
+✅ Data collection successful!
+
+🔄 Step 2: Recalculating opportunities...
+HTTP Status: 200
+Response: {"success":true,"count":43,"timestamp":"..."}
+✅ Opportunities recalculated successfully!
 ```
 
 ## 📅 Horário de Execução
@@ -57,14 +66,21 @@ Para testar se está funcionando **antes** de esperar o cron diário:
 
 ## 🔧 Como Funciona
 
+**Pipeline Diário (2 Steps):**
+
 1. **GitHub Actions** acorda às 0:00 UTC
-2. Faz uma requisição `POST https://curvadejuros.vercel.app/api/recalculate`
-3. A API Vercel:
-   - Coleta dados do B3 (ou gera dados simulados se B3 estiver offline)
-   - Insere no banco Supabase
-   - Recalcula as 43 oportunidades de arbitragem
-   - Atualiza o cache
-4. Frontend automaticamente mostra os novos dados
+2. **Step 1:** Chama `POST /api/collect-data`
+   - Faz scraping dos 9 contratos DI1 do B3
+   - Se B3 estiver offline, usa dados simulados realistas
+   - Insere novos registros no Supabase (tabela `di1_prices`)
+   - Completa em ~15 segundos
+3. **Step 2:** Chama `POST /api/refresh`
+   - Lê dados históricos do banco (últimos 100 dias)
+   - Calcula spreads, z-scores e cointegração
+   - Identifica 43 oportunidades de arbitragem
+   - Atualiza tabela `opportunities_cache`
+   - Completa em ~5 segundos
+4. **Frontend** automaticamente mostra os novos dados
 
 ## 🆓 Custo
 

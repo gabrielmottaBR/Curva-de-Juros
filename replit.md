@@ -95,11 +95,14 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - `/api/health.js` - Health check endpoint (GET /api/health)
 - `/api/opportunities.js` - List opportunities (GET /api/opportunities)
 - `/api/pair/[pairId].js` - Pair details with dynamic routing (GET /api/pair/:id)
-- `/api/recalculate.js` - Manual recalculation trigger (POST /api/recalculate)
-- `/api/collect.js` - Data collection pipeline with B3 scraping, analysis, and caching
+- `/api/collect-data.js` - **Daily data collection** from B3 (POST /api/collect-data) ~15s
+- `/api/refresh.js` - **Recalculate opportunities** from existing data (POST /api/refresh) ~5s
+- `/api/recalculate.js` - Full pipeline (collect + refresh, legacy) ~60s+
+- `/api/collect.js` - Legacy full pipeline (kept for reference)
 - `/api/utils.js` - Business days, date formatting, financial calculations (PU, DV01, z-score, cointegration)
 - `/api/package.json` - CommonJS configuration for serverless functions
-- `vercel.json` - Vercel deployment configuration (cron, maxDuration)
+- `vercel.json` - Vercel deployment configuration (maxDuration)
+- `.github/workflows/daily-collect.yml` - GitHub Actions cron (free alternative to Vercel cron)
 
 ### Key Features
 1. **Automated Data Collection:** Daily scraping at 0:00 UTC (21:00 BRT) via GitHub Actions cron
@@ -114,11 +117,13 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ### Data Flow
 ```
-GitHub Actions (0:00 UTC daily) → POST /api/recalculate
-                                   ↓
-B3 API → Vercel Serverless (collect.js) → Supabase Database → Vercel API → Frontend Display
-                                           (di1_prices)         (JSON)
-                                           (opportunities_cache)
+GitHub Actions (0:00 UTC daily)
+   ↓
+   Step 1: POST /api/collect-data → B3 Scraping → Insert to Supabase (di1_prices)
+   ↓
+   Step 2: POST /api/refresh → Calculate Opportunities → Update Cache (opportunities_cache)
+   ↓
+Frontend → GET /api/opportunities → Display 43 Opportunities
 ```
 
 ### External Dependencies
