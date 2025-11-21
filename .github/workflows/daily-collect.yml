@@ -20,21 +20,34 @@ jobs:
         run: |
           echo "📊 Step 1: Collecting data from B3..."
           
-          response=$(curl -s -w "\n%{http_code}" -X POST \
-            https://curvadejuros.vercel.app/api/collect-data)
+          MAX_RETRIES=3
+          RETRY_DELAY=30
           
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+            
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              https://curvadejuros.vercel.app/api/collect-data)
+            
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n-1)
+            
+            echo "HTTP Status: $http_code"
+            echo "Response: $body"
+            
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "✅ Data collection successful!"
+              exit 0
+            fi
+            
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "⚠️  Failed, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
           
-          echo "HTTP Status: $http_code"
-          echo "Response: $body"
-          
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "✅ Data collection successful!"
-          else
-            echo "❌ Data collection failed with status $http_code"
-            exit 1
-          fi
+          echo "❌ Data collection failed after $MAX_RETRIES attempts"
+          exit 1
       
       - name: Step 2 - Recalculate opportunities
         timeout-minutes: 1
@@ -42,21 +55,34 @@ jobs:
         run: |
           echo "🔄 Step 2: Recalculating opportunities..."
           
-          response=$(curl -s -w "\n%{http_code}" -X POST \
-            https://curvadejuros.vercel.app/api/refresh)
+          MAX_RETRIES=2
+          RETRY_DELAY=15
           
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+            
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              https://curvadejuros.vercel.app/api/refresh)
+            
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n-1)
+            
+            echo "HTTP Status: $http_code"
+            echo "Response: $body"
+            
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "✅ Opportunities recalculated successfully!"
+              exit 0
+            fi
+            
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "⚠️  Failed, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
           
-          echo "HTTP Status: $http_code"
-          echo "Response: $body"
-          
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "✅ Opportunities recalculated successfully!"
-          else
-            echo "❌ Recalculation failed with status $http_code"
-            exit 1
-          fi
+          echo "❌ Recalculation failed after $MAX_RETRIES attempts"
+          exit 1
       
       - name: Log completion
         if: success()

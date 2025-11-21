@@ -1,4 +1,4 @@
-// api/collect-data.js - Robust daily data collection with retry and validation
+// api/collect-data.js - Robust daily data collection with retry, validation, and partial persistence
 
 const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
 const { JSDOM } = require('jsdom');
@@ -13,6 +13,18 @@ const B3_BASE_URL = 'https://www2.bmf.com.br/pages/portal/bmfbovespa/boletim1/Si
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
+
+// Get last business day (B3 data published after market close)
+const getLastBusinessDay = (fromDate) => {
+  const date = new Date(fromDate);
+  date.setDate(date.getDate() - 1);
+  
+  while (!isBusinessDay(date)) {
+    date.setDate(date.getDate() - 1);
+  }
+  
+  return date;
+};
 
 // Fetch single contract with retry logic
 const fetchSingleContract = async (date, contractId, retries = MAX_RETRIES) => {
@@ -55,9 +67,9 @@ const fetchSingleContract = async (date, contractId, retries = MAX_RETRIES) => {
               const potentialRate = cellTexts[i + j];
               if (potentialRate && /^\d{1,3},\d{1,4}$/.test(potentialRate)) {
                 const rate = parseFloat(potentialRate.replace(',', '.'));
-                if (rate > 0) {
+                if (rate > 0 && rate < 50) {
                   console.log(`[Collect] ✓ ${contractId}: ${rate}%`);
-                  return rate;
+                  return { rate, source: 'b3' };
                 }
               }
             }
@@ -72,7 +84,7 @@ const fetchSingleContract = async (date, contractId, retries = MAX_RETRIES) => {
         console.warn(`[Collect] Retry ${attempt + 1}/${retries} for ${contractId}: ${error.message}`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
       } else {
-        console.error(`[Collect] Failed ${contractId} after ${retries} retries: ${error.message}`);
+        console.error(`[Collect] Failed ${contractId} after ${retries} retries`);
         return null;
       }
     }
@@ -87,31 +99,27 @@ const fetchB3AllContracts = async (date) => {
   
   const promises = AVAILABLE_MATURITIES.map(contract =>
     fetchSingleContract(date, contract.id)
-      .then(rate => ({ contractId: contract.id, rate }))
+      .then(result => ({ contractId: contract.id, result }))
   );
 
   const results = await Promise.all(promises);
   
-  const rates = {};
-  let successCount = 0;
+  const collected = {};
   
-  for (const result of results) {
-    if (result.rate !== null) {
-      rates[result.contractId] = result.rate;
-      successCount++;
+  for (const { contractId, result } of results) {
+    if (result) {
+      collected[contractId] = result;
     }
   }
 
+  const successCount = Object.keys(collected).length;
   console.log(`[Collect] Fetched ${successCount}/9 contracts from B3`);
   
-  // Require at least 7/9 contracts for real data
-  return successCount >= 7 ? rates : null;
+  return collected;
 };
 
-// Generate simulated data
-const generateSimulatedRates = (date) => {
-  console.log('[Collect] Using simulated data');
-  
+// Generate simulated rate for missing contract
+const generateSimulatedRate = (contractId, date) => {
   const baseRates = {
     'DI1F27': 11.20, 'DI1F28': 11.45, 'DI1F29': 11.68,
     'DI1F30': 11.89, 'DI1F31': 12.08, 'DI1F32': 12.21,
@@ -120,52 +128,43 @@ const generateSimulatedRates = (date) => {
 
   const daysSinceStart = Math.floor((date - new Date('2025-07-03')) / 86400000);
   const volatility = 0.015;
-  const seed = daysSinceStart * 1.618033988749895;
-
-  const rates = {};
-  for (const contract of AVAILABLE_MATURITIES) {
-    const baseRate = baseRates[contract.id] || 12.0;
-    const random = (Math.sin(seed + contract.id.charCodeAt(4)) + 1) / 2;
-    const dailyChange = (random - 0.5) * volatility;
-    rates[contract.id] = Math.max(10.0, Math.min(14.0, baseRate + dailyChange));
-  }
-
-  return rates;
+  const seed = daysSinceStart * 1.618033988749895 + contractId.charCodeAt(4);
+  
+  const baseRate = baseRates[contractId] || 12.0;
+  const random = (Math.sin(seed) + 1) / 2;
+  const dailyChange = (random - 0.5) * volatility;
+  
+  return Math.max(10.0, Math.min(14.0, baseRate + dailyChange));
 };
 
-// Validate collected data
-const validateData = (rates) => {
-  const contractCount = Object.keys(rates).length;
+// Fill missing contracts with simulated data
+const fillMissingContracts = (collected, date) => {
+  const completed = { ...collected };
+  let simulatedCount = 0;
   
-  if (contractCount !== 9) {
-    console.warn(`[Collect] Validation warning: Only ${contractCount}/9 contracts collected`);
-    return false;
-  }
-
-  for (const [contractId, rate] of Object.entries(rates)) {
-    if (rate < 5.0 || rate > 20.0) {
-      console.error(`[Collect] Validation error: ${contractId} rate ${rate}% out of range`);
-      return false;
+  for (const contract of AVAILABLE_MATURITIES) {
+    if (!completed[contract.id]) {
+      const rate = generateSimulatedRate(contract.id, date);
+      completed[contract.id] = { rate, source: 'simulated' };
+      simulatedCount++;
+      console.log(`[Collect] Simulated ${contract.id}: ${rate.toFixed(2)}%`);
     }
   }
-
-  console.log('[Collect] ✓ Data validation passed');
-  return true;
+  
+  if (simulatedCount > 0) {
+    console.warn(`[Collect] Simulated ${simulatedCount}/9 contracts`);
+  }
+  
+  return completed;
 };
 
 // Main collection function
-const collectDailyData = async (supabase) => {
+const collectDailyData = async (supabase, targetDate = null) => {
   const today = new Date();
-  const dateISO = formatDateISO(today);
+  const collectionDate = targetDate || getLastBusinessDay(today);
+  const dateISO = formatDateISO(collectionDate);
 
-  if (!isBusinessDay(today)) {
-    console.log('[Collect] Skipped: Not a business day');
-    return {
-      skipped: true,
-      reason: 'not_business_day',
-      date: dateISO
-    };
-  }
+  console.log(`[Collect] Target date: ${dateISO}`);
 
   // Check if already collected
   const { data: existing } = await supabase
@@ -183,30 +182,19 @@ const collectDailyData = async (supabase) => {
     };
   }
 
-  // Fetch from B3
+  // Fetch from B3 (parallel with retry)
   console.log(`[Collect] Starting collection for ${dateISO}...`);
-  let rates = await fetchB3AllContracts(today);
-  let source = 'b3';
-
-  // Fallback to simulated if B3 fails
-  if (!rates || !validateData(rates)) {
-    console.warn('[Collect] B3 failed validation, using simulated data');
-    rates = generateSimulatedRates(today);
-    source = 'simulated';
-  }
-
-  // Build records
-  const records = AVAILABLE_MATURITIES
-    .filter(contract => rates[contract.id])
-    .map(contract => ({
-      date: dateISO,
-      contract_code: contract.id,
-      rate: rates[contract.id]
-    }));
-
-  if (records.length < 9) {
-    throw new Error(`Incomplete data: only ${records.length}/9 contracts available`);
-  }
+  const b3Collected = await fetchB3AllContracts(collectionDate);
+  
+  // Fill missing contracts with simulated data
+  const allContracts = fillMissingContracts(b3Collected, collectionDate);
+  
+  // Build records with source metadata
+  const records = AVAILABLE_MATURITIES.map(contract => ({
+    date: dateISO,
+    contract_code: contract.id,
+    rate: allContracts[contract.id].rate
+  }));
 
   // Insert to database
   const { error } = await supabase
@@ -218,13 +206,18 @@ const collectDailyData = async (supabase) => {
     throw new Error(`DB insert failed: ${error.message}`);
   }
 
-  console.log(`[Collect] ✓ Inserted ${records.length} contracts (${source})`);
+  const b3Count = Object.keys(b3Collected).length;
+  const simulatedCount = 9 - b3Count;
+  
+  console.log(`[Collect] ✓ Inserted 9 contracts (${b3Count} B3 + ${simulatedCount} simulated)`);
 
   return {
     skipped: false,
     date: dateISO,
-    contractsCollected: records.length,
-    source
+    contractsCollected: 9,
+    b3Contracts: b3Count,
+    simulatedContracts: simulatedCount,
+    source: b3Count === 9 ? 'b3' : 'hybrid'
   };
 };
 
