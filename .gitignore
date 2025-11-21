@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .github/workflows/
+
+# GitHub workflows (adicionar manualmente via GitHub web)
+.github/workflows/
