@@ -9,13 +9,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  collect-data:
+  collect-and-analyze:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Trigger Vercel API data refresh
+      - name: Step 1 - Collect data from B3
         run: |
-          echo "🚀 Triggering daily data refresh..."
+          echo "📊 Step 1: Collecting data from B3..."
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://curvadejuros.vercel.app/api/collect-data)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Data collection successful!"
+          else
+            echo "❌ Data collection failed with status $http_code"
+            exit 1
+          fi
+      
+      - name: Step 2 - Recalculate opportunities
+        run: |
+          echo "🔄 Step 2: Recalculating opportunities..."
           
           response=$(curl -s -w "\n%{http_code}" -X POST \
             https://curvadejuros.vercel.app/api/refresh)
@@ -23,13 +43,13 @@ jobs:
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
           
-          echo "📊 HTTP Status: $http_code"
-          echo "📝 Response: $body"
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
           
           if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "✅ Data collection completed successfully!"
+            echo "✅ Opportunities recalculated successfully!"
           else
-            echo "❌ Data collection failed with status $http_code"
+            echo "❌ Recalculation failed with status $http_code"
             exit 1
           fi
       
