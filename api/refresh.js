@@ -52,7 +52,7 @@ const scanOpportunities = async (supabase) => {
       if (spreads.length < 20) continue;
 
       const meanSpread = calculateMean(spreads);
-      const stdDevSpread = calculateStdDev(spreads);
+      const stdDevSpread = calculateStdDev(spreads, meanSpread);
       const currentSpread = spreads[spreads.length - 1];
       const zScore = calculateZScore(currentSpread, meanSpread, stdDevSpread);
 
