@@ -1,0 +1,92 @@
+name: Daily Data Collection
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  collect-and-analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Step 1 - Collect data from B3
+        timeout-minutes: 2
+        continue-on-error: false
+        run: |
+          echo "📊 Step 1: Collecting data from B3..."
+
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              https://curvadejuros.vercel.app/api/collect-data)
+
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n-1)
+
+            echo "HTTP Status: $http_code"
+            echo "Response: $body"
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "✅ Data collection successful!"
+              exit 0
+            fi
+
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "⚠️  Failed, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          echo "❌ Data collection failed after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Step 2 - Recalculate opportunities
+        timeout-minutes: 1
+        continue-on-error: false
+        run: |
+          echo "🔄 Step 2: Recalculating opportunities..."
+
+          MAX_RETRIES=2
+          RETRY_DELAY=15
+
+          for attempt in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $attempt/$MAX_RETRIES..."
+
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              https://curvadejuros.vercel.app/api/refresh)
+
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n-1)
+
+            echo "HTTP Status: $http_code"
+            echo "Response: $body"
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "✅ Opportunities recalculated successfully!"
+              exit 0
+            fi
+
+            if [ $attempt -lt $MAX_RETRIES ]; then
+              echo "⚠️  Failed, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          echo "❌ Recalculation failed after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Log completion
+        if: success()
+        run: |
+          echo "✅ Cron job completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: Log failure
+        if: failure()
+        run: |
+          echo "❌ Cron job failed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
