@@ -5,9 +5,6 @@
     "api/collect-data.js": {
       "maxDuration": 60
     },
-    "api/collect-b3-real.js": {
-      "maxDuration": 30
-    },
     "api/collect-simple.js": {
       "maxDuration": 20
     },

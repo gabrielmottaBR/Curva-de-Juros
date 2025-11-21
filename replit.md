@@ -6,7 +6,15 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection.
 
 ## Recent Changes
-- **2025-11-21 (Latest Session - SYSTEM 100% OPERATIONAL):** Completed automated daily data collection system
+- **2025-11-21 (Latest Session - DATA SOURCE RESEARCH):** Investigated B3 real data integration
+  - HTML scraping NOT viable (SistemaPregao1.asp is interactive form, no static data)
+  - Researched 4 alternatives: BDI CSV, rb3 R package, UP2DATA, paid APIs
+  - Decision: Keep simulated data for stability (system 100% operational)
+  - Documented viable alternatives in B3_DATA_SOURCES.md
+  - **Current production: 100% simulated data (realistic, calibrated)**
+  - **Future enhancement: BDI CSV parser (2-3 hours implementation)**
+
+- **2025-11-21 (Earlier - SYSTEM 100% OPERATIONAL):** Completed automated daily data collection system
   - Implemented B3 holiday calendar 2025-2030 (54 holidays: 9 fixed + 4 movable per year)
   - Fixed timing: collects previous business day (B3 data published after 18:00, collection at 21:00 BRT)
   - Created simplified collection endpoint (`/api/collect-simple.js`) using simulated data
