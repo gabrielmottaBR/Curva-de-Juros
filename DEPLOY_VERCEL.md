@@ -1,4 +1,4 @@
-# Deploy Completo na Vercel (Frontend + Backend)
+# Deploy 100% na Vercel (Frontend + Backend Serverless)
 
 ## 🎯 Arquitetura
 
@@ -20,11 +20,14 @@
 - ✅ Backend serverless escalável
 - ✅ HTTPS grátis
 
-**Funcionalidades:**
-- ✅ Coleta de dados via `/api/collect`
-- ✅ Análise automática de oportunidades
-- ⚠️ **Cron jobs automáticos (21:00 diário) requerem Vercel Pro ($20/mês)**
-- ✅ No plano gratuito, coleta manual via endpoint `/api/collect`
+**O que foi implementado:**
+- ✅ Frontend React (build estático no Vercel CDN)
+- ✅ Backend completo em JavaScript serverless (api/index.js + api/collect.js)
+- ✅ Lógica completa de coleta B3, cálculos de risco (PU, DV01, hedge ratios)
+- ✅ Análise de oportunidades com z-score e cointegração
+- ✅ Endpoints: /api/health, /api/opportunities, /api/pair/:id, /api/collect
+- ⚠️ **Cron automático (21:00 diário) requer Vercel Pro ($20/mês)**
+- ✅ **Plano gratuito:** Coleta manual via /api/collect ou serviços externos grátis
 
 ---
 
@@ -139,21 +142,17 @@ tsx server/scripts/enhancedBackfill.ts
 
 ### Cron Jobs Automáticos (Vercel Pro - $20/mês)
 
-**Já está configurado!** Se você atualizar para Vercel Pro:
+✅ **Já está 100% configurado!**
 
-1. ✅ O arquivo `vercel.json` já tem a configuração de cron:
-   ```json
-   "crons": [{ "path": "/api/collect", "schedule": "0 0 * * *" }]
-   ```
+Se você atualizar para Vercel Pro ($20/mês), o cron job começará automaticamente:
 
-2. ✅ O endpoint `/api/collect` já está implementado
+1. ✅ `vercel.json` já tem o cron configurado
+2. ✅ `api/collect.js` implementa todo o pipeline de coleta
+3. ✅ Horário: `"0 0 * * *"` = 00:00 UTC = 21:00 BRT
 
-3. **Ajustar horário para 21:00 BRT:**
-   ```json
-   "schedule": "0 0 * * *"  // UTC (00:00 = 21:00 BRT)
-   ```
+**Observação:** O schedule do Vercel é em UTC. Atualmente configurado para 00:00 UTC (21:00 BRT).
 
-Ao fazer upgrade para Pro, o cron job começará automaticamente!
+Ao fazer upgrade para Pro, o cron job executará diariamente às 21:00 BRT automaticamente!
 
 ---
 
