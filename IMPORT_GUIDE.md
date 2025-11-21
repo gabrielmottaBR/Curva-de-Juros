@@ -37,7 +37,7 @@ Every import is logged to `import_metadata` table with:
 
 ### 1. First Time Import
 ```bash
-node scripts/import-real-data.js
+node scripts/import-real-data.cjs
 ```
 
 Expected output:
@@ -92,7 +92,7 @@ Running the script again is **100% safe**:
 - Import metadata tracks each run
 
 ```bash
-node scripts/import-real-data.js
+node scripts/import-real-data.cjs
 ```
 
 ### 3. After Import: Recalculate Opportunities
@@ -154,7 +154,7 @@ date,contract_code,rate
 
 ### Run Production Safety Check
 ```bash
-node scripts/validate-real-data.js
+node scripts/validate-real-data.cjs
 ```
 
 This validates:
