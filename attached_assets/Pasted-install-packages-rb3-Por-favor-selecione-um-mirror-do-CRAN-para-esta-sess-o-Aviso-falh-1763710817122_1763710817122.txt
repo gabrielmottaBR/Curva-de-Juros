@@ -1,0 +1,40 @@
+install.packages("rb3")
+--- Por favor selecione um mirror do CRAN para esta sessão ---
+Aviso: falha ao baixar arquivo de mirrors (não foi possível abrir a URL 'https://cran.r-project.org/CRAN_mirrors.csv'); usando arquivo local 'C:/Users/EK40/AppData/Local/Programs/R/R-4.5.2/doc/CRAN_mirrors.csv'
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/src/contrib:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/src/contrib/PACKAGES'
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5/PACKAGES'
+Mensagens de aviso:
+1: In download.file(url, destfile = f, quiet = TRUE) :
+  URL 'https://cran.r-project.org/CRAN_mirrors.csv': status was 'SSL connect error'
+2: pacote ‘rb3’ não está disponível for this version of R
+
+Uma versão deste pacote para a sua versão do R pode estar disponível em outro lugar,
+veja as ideias em
+https://cran.r-project.org/doc/manuals/r-patched/R-admin.html#Installing-packages 
+
+install.packages("dplyr")
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/src/contrib:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/src/contrib/PACKAGES'
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5/PACKAGES'
+Mensagen de aviso:
+pacote ‘dplyr’ não está disponível for this version of R
+
+Uma versão deste pacote para a sua versão do R pode estar disponível em outro lugar,
+veja as ideias em
+https://cran.r-project.org/doc/manuals/r-patched/R-admin.html#Installing-packages 
+
+
+install.packages("bizdays")
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/src/contrib:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/src/contrib/PACKAGES'
+Aviso: não é possível acessar o índice para o repositório https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5:
+  não foi possível abrir a URL 'https://vps.fmvz.usp.br/CRAN/bin/windows/contrib/4.5/PACKAGES'
+Mensagen de aviso:
+pacote ‘bizdays’ não está disponível for this version of R
+
+Uma versão deste pacote para a sua versão do R pode estar disponível em outro lugar,
+veja as ideias em
+https://cran.r-project.org/doc/manuals/r-patched/R-admin.html#Installing-packages 

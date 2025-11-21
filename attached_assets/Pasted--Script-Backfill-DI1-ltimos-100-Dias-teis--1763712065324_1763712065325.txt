@@ -1,0 +1,193 @@
+ # ============================================
+> # Script: Backfill DI1 - Últimos 100 Dias Úteis
+> # Objetivo: Extrair dados reais B3 via rb3
+> # ============================================
+> 
+> library(rb3)
+> library(dplyr)
+> library(bizdays)
+> 
+> cat("?? Iniciando backfill DI1...\n\n")
+?? Iniciando backfill DI1...
+
+> 
+> # 1. Configurar calendário B3
+> cat("?? Configurando calendário B3...\n")
+?? Configurando calendário B3...
+> bizdays.options$set(default.calendar = "Brazil/ANBIMA")
+> 
+> # 2. Calcular período (aproximadamente 100 dias úteis)
+> data_fim <- Sys.Date() - 1  # Ontem
+> data_inicio <- Sys.Date() - 150  # ~100 business days
+> 
+> cat(sprintf("?? Período: %s até %s\n", data_inicio, data_fim))
+?? Período: 2025-06-24 até 2025-11-20
+> 
+> # 3. Criar sequência de dias úteis
+> cat("\n?? Gerando sequência de business days...\n")
+
+?? Gerando sequência de business days...
+> business_days <- bizseq(data_inicio, data_fim, "Brazil/ANBIMA")
+> cat(sprintf("  - Total de dias úteis: %d\n", length(business_days)))
+  - Total de dias úteis: 107
+> 
+> # 4. Baixar dados do mercado futuro
+> cat("\n⏳ Baixando dados da B3 (pode levar 2-3 minutos)...\n")
+
+⏳ Baixando dados da B3 (pode levar 2-3 minutos)...
+> 
+> # Usar fetch_marketdata para download
+> fetch_marketdata(
++   "b3-futures-settlement-prices",
++   refdate = business_days
++ )
+
+── Fetching market data for `b3-futures-settlement-prices` ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+━━ Downloading data
+ℹ Downloading 107 files, skipping 0
+Downloading data ■                                  1% | ETA:  2mDownloading data ■■                                 2% | ETA:  2mDownloading data ■■                                 3% | ETA:  2mDownloading data ■■                                 4% | ETA:  1mDownloading data ■■                                 5% | ETA:  1mDownloading data ■■■                                6% | ETA:  1mDownloading data ■■■                                7% | ETA:  1mDownloading data ■■■                                7% | ETA:  1mDownloading data ■■■■                               8% | ETA: 49sDownloading data ■■■■                               9% | ETA: 46sDownloading data ■■■■                              10% | ETA: 44sDownloading data ■■■■                              11% | ETA: 42sDownloading data ■■■■■                             12% | ETA: 41sDownloading data ■■■■■                             13% | ETA: 39sDownloading data ■■■■■                             14% | ETA: 38sDownloading data ■■■■■                             15% | ETA: 37sDownloading data ■■■■■■                            16% | ETA: 36sDownloading data ■■■■■■                            17% | ETA: 35sDownloading data ■■■■■■                            18% | ETA: 35sDownloading data ■■■■■■■                           19% | ETA: 34sDownloading data ■■■■■■■                           20% | ETA: 33sDownloading data ■■■■■■■                           21% | ETA: 32sDownloading data ■■■■■■■                           21% | ETA: 32sDownloading data ■■■■■■■■                          22% | ETA: 31sDownloading data ■■■■■■■■                          23% | ETA: 30sDownloading data ■■■■■■■■                          24% | ETA: 30sDownloading data ■■■■■■■■■                         25% | ETA: 30sDownloading data ■■■■■■■■■                         26% | ETA: 29sDownloading data ■■■■■■■■■                         27% | ETA: 29sDownloading data ■■■■■■■■■                         28% | ETA: 28sDownloading data ■■■■■■■■■■                        29% | ETA: 27sDownloading data ■■■■■■■■■■                        30% | ETA: 27sDownloading data ■■■■■■■■■■                        31% | ETA: 27sDownloading data ■■■■■■■■■■■                       32% | ETA: 26sDownloading data ■■■■■■■■■■■                       33% | ETA: 26sDownloading data ■■■■■■■■■■■                       34% | ETA: 25sDownloading data ■■■■■■■■■■■                       35% | ETA: 25sDownloading data ■■■■■■■■■■■■                      36% | ETA: 24sDownloading data ■■■■■■■■■■■■                      36% | ETA: 24sDownloading data ■■■■■■■■■■■■                      37% | ETA: 23sDownloading data ■■■■■■■■■■■■                      38% | ETA: 23sDownloading data ■■■■■■■■■■■■■                     39% | ETA: 23sDownloading data ■■■■■■■■■■■■■                     40% | ETA: 22sDownloading data ■■■■■■■■■■■■■                     41% | ETA: 22sDownloading data ■■■■■■■■■■■■■■                    42% | ETA: 21sDownloading data ■■■■■■■■■■■■■■                    43% | ETA: 21sDownloading data ■■■■■■■■■■■■■■                    44% | ETA: 21sDownloading data ■■■■■■■■■■■■■■                    45% | ETA: 20sDownloading data ■■■■■■■■■■■■■■■                   46% | ETA: 20sDownloading data ■■■■■■■■■■■■■■■                   47% | ETA: 20sDownloading data ■■■■■■■■■■■■■■■                   48% | ETA: 19sDownloading data ■■■■■■■■■■■■■■■■                  49% | ETA: 19sDownloading data ■■■■■■■■■■■■■■■■                  50% | ETA: 18sDownloading data ■■■■■■■■■■■■■■■■                  50% | ETA: 18sDownloading data ■■■■■■■■■■■■■■■■                  51% | ETA: 18sDownloading data ■■■■■■■■■■■■■■■■■                 52% | ETA: 17sDownloading data ■■■■■■■■■■■■■■■■■                 53% | ETA: 17sDownloading data ■■■■■■■■■■■■■■■■■                 54% | ETA: 17sDownloading data ■■■■■■■■■■■■■■■■■■                55% | ETA: 16sDownloading data ■■■■■■■■■■■■■■■■■■                56% | ETA: 16sDownloading data ■■■■■■■■■■■■■■■■■■                57% | ETA: 16sDownloading data ■■■■■■■■■■■■■■■■■■                58% | ETA: 15sDownloading data ■■■■■■■■■■■■■■■■■■■               59% | ETA: 15sDownloading data ■■■■■■■■■■■■■■■■■■■               60% | ETA: 14sDownloading data ■■■■■■■■■■■■■■■■■■■               61% | ETA: 14sDownloading data ■■■■■■■■■■■■■■■■■■■■              62% | ETA: 14sDownloading data ■■■■■■■■■■■■■■■■■■■■              63% | ETA: 13sDownloading data ■■■■■■■■■■■■■■■■■■■■              64% | ETA: 13sDownloading data ■■■■■■■■■■■■■■■■■■■■              64% | ETA: 13sDownloading data ■■■■■■■■■■■■■■■■■■■■■             65% | ETA: 12sDownloading data ■■■■■■■■■■■■■■■■■■■■■             66% | ETA: 12sDownloading data ■■■■■■■■■■■■■■■■■■■■■             67% | ETA: 12sDownloading data ■■■■■■■■■■■■■■■■■■■■■             68% | ETA: 11sDownloading data ■■■■■■■■■■■■■■■■■■■■■■            69% | ETA: 11sDownloading data ■■■■■■■■■■■■■■■■■■■■■■            70% | ETA: 11sDownloading data ■■■■■■■■■■■■■■■■■■■■■■            71% | ETA: 10sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■           72% | ETA: 10sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■           73% | ETA: 10sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■           74% | ETA:  9sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■           75% | ETA:  9sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■          76% | ETA:  9sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■          77% | ETA:  8sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■          78% | ETA:  8sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■         79% | ETA:  8sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■         79% | ETA:  7sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■         80% | ETA:  7sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■         81% | ETA:  7sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■        82% | ETA:  6sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■        83% | ETA:  6sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■        84% | ETA:  6sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■       85% | ETA:  5sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■       86% | ETA:  5sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■       87% | ETA:  5sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■       88% | ETA:  4sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      89% | ETA:  4sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      90% | ETA:  4sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      91% | ETA:  3sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      92% | ETA:  3sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■     93% | ETA:  3sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■     93% | ETA:  2sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■     94% | ETA:  2sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    95% | ETA:  2sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    96% | ETA:  1sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    97% | ETA:  1sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    98% | ETA:  1sDownloading data ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■   99% | ETA:  0s                                                                 ✔ 107 files downloaded [35.28s]
+━━ Processing data layers
+ℹ Updating input layer
+Updating input layer ■■■■                               8% | ETA: 12sUpdating input layer ■■■■                               9% | ETA: 11sUpdating input layer ■■■■                              10% | ETA: 11sUpdating input layer ■■■■■                             12% | ETA: 11sUpdating input layer ■■■■■                             14% | ETA: 11sUpdating input layer ■■■■■■                            16% | ETA: 11sUpdating input layer ■■■■■■                            18% | ETA: 10sUpdating input layer ■■■■■■■                           19% | ETA: 10sUpdating input layer ■■■■■■■                           21% | ETA: 10sUpdating input layer ■■■■■■■                           21% | ETA: 10sUpdating input layer ■■■■■■■■                          23% | ETA: 10sUpdating input layer ■■■■■■■■■                         25% | ETA: 10sUpdating input layer ■■■■■■■■■                         27% | ETA:  9sUpdating input layer ■■■■■■■■■                         28% | ETA:  9sUpdating input layer ■■■■■■■■■■                        30% | ETA:  9sUpdating input layer ■■■■■■■■■■■                       32% | ETA:  9sUpdating input layer ■■■■■■■■■■■                       33% | ETA:  9sUpdating input layer ■■■■■■■■■■■                       35% | ETA:  8sUpdating input layer ■■■■■■■■■■■■                      36% | ETA:  8sUpdating input layer ■■■■■■■■■■■■                      37% | ETA:  8sUpdating input layer ■■■■■■■■■■■■■                     39% | ETA:  8sUpdating input layer ■■■■■■■■■■■■■                     41% | ETA:  8sUpdating input layer ■■■■■■■■■■■■■■                    42% | ETA:  8sUpdating input layer ■■■■■■■■■■■■■■                    44% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■                    45% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■■                   47% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■■                   48% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■■■                  50% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■■■                  50% | ETA:  7sUpdating input layer ■■■■■■■■■■■■■■■■■                 52% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■                 53% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■■                55% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■■                56% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■■                58% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■■■               59% | ETA:  6sUpdating input layer ■■■■■■■■■■■■■■■■■■■               61% | ETA:  5sUpdating input layer ■■■■■■■■■■■■■■■■■■■■              62% | ETA:  5sUpdating input layer ■■■■■■■■■■■■■■■■■■■■              64% | ETA:  5sUpdating input layer ■■■■■■■■■■■■■■■■■■■■              64% | ETA:  5sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■             66% | ETA:  5sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■             67% | ETA:  4sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■            69% | ETA:  4sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■            71% | ETA:  4sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■           73% | ETA:  4sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■           74% | ETA:  4sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■          76% | ETA:  3sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■          77% | ETA:  3sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■         79% | ETA:  3sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■         79% | ETA:  3sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■         81% | ETA:  3sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■        82% | ETA:  2sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■        84% | ETA:  2sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■       86% | ETA:  2sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■       87% | ETA:  2sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      89% | ETA:  2sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      90% | ETA:  1sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■      92% | ETA:  1sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■     93% | ETA:  1sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■     94% | ETA:  1sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    95% | ETA:  1sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    97% | ETA:  0sUpdating input layer ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■    98% | ETA:  0s                                                                     ✔ input layer updated - 107 files processed [13.87s]
+ℹ input layer changed
+ℹ Creating staging layer
+✔ staging layer created [0.13s]
+> 
+> cat("✅ Download concluído!\n")
+✅ Download concluído!
+> 
+> # 5. Carregar dados de futuros
+> cat("\n?? Carregando e filtrando contratos DI1...\n")
+
+?? Carregando e filtrando contratos DI1...
+> 
+> # Coletar dados de todos os dias úteis
+> all_data <- list()
+> for(i in seq_along(business_days)) {
++   day_data <- tryCatch({
++     futures_get(refdate = business_days[i]) %>%
++       filter(commodity == "DI1", symbol != "DI1", !is.na(price))
++   }, error = function(e) {
++     NULL
++   })
++   
++   if(!is.null(day_data) && nrow(day_data) > 0) {
++     all_data[[i]] <- day_data
++   }
++   
++   if(i %% 20 == 0) {
++     cat(sprintf("  - Processados %d de %d dias...\n", i, length(business_days)))
++   }
++ }
+  - Processados 20 de 107 dias...
+  - Processados 40 de 107 dias...
+  - Processados 60 de 107 dias...
+  - Processados 80 de 107 dias...
+  - Processados 100 de 107 dias...
+> 
+> # Combinar todos os dados
+> di1_data <- bind_rows(all_data)
+> 
+> cat(sprintf("  - Total de registros brutos: %d\n", nrow(di1_data)))
+  - Total de registros brutos: 0
+> 
+> # 6. Converter para formato esperado
+> cat("\n?? Convertendo formato e calculando taxas...\n")
+
+?? Convertendo formato e calculando taxas...
+> 
+> di1_formatted <- di1_data %>%
++   mutate(
++     # Extrair ano do maturity_code (F27 → 27)
++     year = substr(maturity_code, 2, 3),
++     contract_code = paste0("DI1F", year),
++     # Converter maturity_code para data
++     maturity_date = maturitycode2date(maturity_code),
++     # Calcular dias úteis até vencimento
++     business_days = bizdays(refdate, maturity_date, "Brazil/ANBIMA"),
++     # Calcular taxa implícita (PU → taxa anual %)
++     rate = ifelse(business_days > 0,
++                   ((100000 / price)^(252 / business_days) - 1) * 100,
++                   NA)
++   ) %>%
++   filter(
++     # Apenas contratos que nos interessam
++     contract_code %in% c("DI1F27", "DI1F28", "DI1F29", "DI1F30",
++                          "DI1F31", "DI1F32", "DI1F33", "DI1F34", "DI1F35"),
++     # Apenas dados válidos
++     !is.na(rate),
++     rate > 0,
++     rate < 30  # Sanity check (taxas absurdas)
++   ) %>%
++   select(
++     date = refdate,
++     contract_code,
++     rate
++   ) %>%
++   arrange(date, contract_code)
+Error in `mutate()`:
+ℹ In argument: `year = substr(maturity_code, 2, 3)`.
+Caused by error:
+! objeto 'maturity_code' não encontrado
+Run `rlang::last_trace()` to see where the error occurred.
+> 
+> # 7. Estatísticas
+> cat("\n?? Estatísticas Finais:\n")
+
+?? Estatísticas Finais:
+> cat(sprintf("  - Total de registros: %d\n", nrow(di1_formatted)))
+Erro: objeto 'di1_formatted' não encontrado
+> cat(sprintf("  - Datas únicas: %d\n", length(unique(di1_formatted$date))))
+Erro: objeto 'di1_formatted' não encontrado
+> cat(sprintf("  - Contratos únicos: %s\n", 
++             paste(sort(unique(di1_formatted$contract_code)), collapse=", ")))
+Erro: objeto 'di1_formatted' não encontrado
+> 
+> # Verificar cobertura
+> cobertura <- di1_formatted %>%
++   group_by(date) %>%
++   summarise(n_contratos = n()) %>%
++   arrange(date)
+Erro: objeto 'di1_formatted' não encontrado
+> 
+> cat("\n?? Resumo de Cobertura:\n")
+
+?? Resumo de Cobertura:
+> cat(sprintf("  - Média de contratos por dia: %.1f\n", mean(cobertura$n_contratos)))
+Erro: objeto 'cobertura' não encontrado
+> cat(sprintf("  - Dias com 9 contratos: %d\n", sum(cobertura$n_contratos == 9)))
+Erro: objeto 'cobertura' não encontrado
+> cat(sprintf("  - Dias com menos de 9: %d\n", sum(cobertura$n_contratos < 9)))
+Erro: objeto 'cobertura' não encontrado
+> 
+> # Mostrar primeiras e últimas linhas
+> cat("\n?? Primeiras 10 linhas:\n")
+
+?? Primeiras 10 linhas:
+> print(head(di1_formatted, 10))
+Erro: objeto 'di1_formatted' não encontrado
+> 
+> cat("\n?? Últimas 10 linhas:\n")
+
+?? Últimas 10 linhas:
+> print(tail(di1_formatted, 10))
+Erro: objeto 'di1_formatted' não encontrado
+> 
+> # 8. Exportar CSV
+> output_file <- "b3_backfill_100days.csv"
+> write.csv(di1_formatted, output_file, row.names = FALSE)
+Error in eval(expr, p) : objeto 'di1_formatted' não encontrado
+> 
+> cat(sprintf("\n✅ SUCESSO! Arquivo exportado: %s\n", output_file))
+
+✅ SUCESSO! Arquivo exportado: b3_backfill_100days.csv
+> cat(sprintf("?? Localização: %s/%s\n", getwd(), output_file))
+?? Localização: C:/Users/EK40/OneDrive - PETROBRAS/Documents/b3_backfill_100days.csv
+> cat("\n?? Próximos passos:\n")
+
+?? Próximos passos:
+> cat("  1. Abrir o arquivo CSV\n")
+  1. Abrir o arquivo CSV
+> cat("  2. Copiar todo o conteúdo (Ctrl+A, Ctrl+C)\n")
+  2. Copiar todo o conteúdo (Ctrl+A, Ctrl+C)
+> cat("  3. Enviar para o Replit Agent\n")

@@ -1,0 +1,87 @@
+> # ============================================cat("  3. Enviar para o Replit Agent\n")
+> # DIAGNÓSTICO: Verificar estrutura dos dados
+> # ============================================
+> 
+> library(rb3)
+> library(dplyr)
+> library(bizdays)
+> 
+> cat("?? Iniciando diagnóstico...\n\n")
+?? Iniciando diagnóstico...
+
+> 
+> # Configurar calendário
+> bizdays.options$set(default.calendar = "Brazil/ANBIMA")
+> 
+> # Testar com uma data específica recente
+> test_date <- as.Date("2025-11-20")
+> 
+> cat(sprintf("?? Testando data: %s\n\n", test_date))
+?? Testando data: 2025-11-20
+
+> 
+> # 1. Tentar carregar dados
+> cat("1️⃣ Carregando dados brutos...\n")
+1️⃣ Carregando dados brutos...
+> raw_data <- futures_get(refdate = test_date)
+Error in futures_get(refdate = test_date) : 
+  argumento não utilizado (refdate = test_date)
+> 
+> if(is.null(raw_data) || nrow(raw_data) == 0) {
++   cat("⚠️  PROBLEMA: Nenhum dado retornado!\n")
++   cat("Possíveis causas:\n")
++   cat("  - Data sem pregão (feriado/fim de semana)\n")
++   cat("  - Dados ainda não disponíveis para datas recentes\n")
++   cat("  - Problema no cache do rb3\n\n")
++   
++   # Tentar data mais antiga
++   test_date <- as.Date("2025-10-01")
++   cat(sprintf("?? Tentando data mais antiga: %s\n", test_date))
++   raw_data <- futures_get(refdate = test_date)
++ }
+Erro: objeto 'raw_data' não encontrado
+> 
+> if(!is.null(raw_data) && nrow(raw_data) > 0) {
++   cat(sprintf("✅ Dados carregados: %d registros\n\n", nrow(raw_data)))
++   
++   # 2. Verificar estrutura
++   cat("2️⃣ Estrutura dos dados:\n")
++   cat("Colunas disponíveis:\n")
++   print(names(raw_data))
++   cat("\n")
++   
++   # 3. Ver primeiras linhas
++   cat("3️⃣ Primeiras 10 linhas:\n")
++   print(head(raw_data, 10))
++   cat("\n")
++   
++   # 4. Verificar commodities disponíveis
++   cat("4️⃣ Commodities disponíveis:\n")
++   commodities <- raw_data %>%
++     group_by(commodity) %>%
++     summarise(count = n()) %>%
++     arrange(desc(count))
++   print(commodities)
++   cat("\n")
++   
++   # 5. Procurar por DI1 (ou variações)
++   cat("5️⃣ Buscando contratos DI...\n")
++   di_contracts <- raw_data %>%
++     filter(grepl("^DI", symbol, ignore.case = TRUE) | 
++            grepl("^DI", commodity, ignore.case = TRUE))
++   
++   if(nrow(di_contracts) > 0) {
++     cat(sprintf("✅ Encontrados %d contratos DI!\n", nrow(di_contracts)))
++     print(head(di_contracts, 20))
++   } else {
++     cat("❌ Nenhum contrato DI encontrado\n")
++     cat("Isso pode indicar que:\n")
++     cat("  - O nome da commodity mudou\n")
++     cat("  - Os dados estão em formato diferente\n")
++     cat("  - Precisamos usar outra abordagem\n")
++   }
++   
++ } else {
++   cat("❌ Não foi possível carregar dados!\n")
++   cat("Vamos tentar abordagem alternativa...\n")
++ }
