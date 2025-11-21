@@ -19,8 +19,8 @@ module.exports = async (req, res) => {
       .order('calculated_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching opportunities:', error);
-      return res.status(500).json({ error: 'Failed to fetch opportunities', details: error.message });
+      console.error('[Opportunities API] Database error:', error);
+      return res.status(500).json({ error: 'Failed to fetch opportunities' });
     }
 
     const opportunities = (data || []).map(row => ({
@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Unexpected error in /api/opportunities:', err);
-    res.status(500).json({ error: 'Internal server error', message: err.message });
+    console.error('[Opportunities API] Unexpected error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

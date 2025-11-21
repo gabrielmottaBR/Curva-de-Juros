@@ -11,10 +11,16 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Extract pairId from query, params, or URL
-    const pairId = req.query?.pairId || req.params?.pairId || req.url?.split('/').pop();
+    // Extract pairId robustly from Vercel's dynamic route
+    let pairId = req.query?.pairId;
+    
+    // Fallback: parse from URL if query is undefined
+    if (!pairId && req.url) {
+      const urlParts = req.url.split('?')[0].split('/'); // Remove query string first
+      pairId = urlParts[urlParts.length - 1];
+    }
 
-    if (!pairId) {
+    if (!pairId || pairId === '[pairId]') {
       return res.status(400).json({ error: 'pairId is required' });
     }
 
@@ -27,7 +33,7 @@ module.exports = async (req, res) => {
       .single();
 
     if (error || !data) {
-      console.error('Error fetching pair details:', error);
+      console.error('[Pair API] Error fetching pair:', error?.message || 'Not found');
       return res.status(404).json({ error: 'Pair not found' });
     }
 
@@ -56,7 +62,7 @@ module.exports = async (req, res) => {
     res.status(200).json(response);
 
   } catch (err) {
-    console.error('Unexpected error in /api/pair/:pairId:', err);
-    res.status(500).json({ error: 'Internal server error', message: err.message });
+    console.error('[Pair API] Unexpected error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -15,9 +15,9 @@ module.exports = async (req, res) => {
     // Call the collect handler directly
     await collectHandler(req, res);
   } catch (err) {
-    console.error('Error in recalculate endpoint:', err);
+    console.error('[Recalculate API] Error:', err);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to recalculate opportunities', message: err.message });
+      res.status(500).json({ error: 'Failed to recalculate opportunities' });
     }
   }
 };
