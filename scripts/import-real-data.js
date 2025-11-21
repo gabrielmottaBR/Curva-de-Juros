@@ -84,7 +84,38 @@ function parseCSV(filePath) {
   }
   
   console.log(`✅ Parsed ${records.length} valid records (skipped ${skipped})`);
-  return records;
+  
+  // Remove duplicates by averaging rates for same date+contract
+  console.log('\n🔄 Removing duplicates (averaging rates for same date+contract)...');
+  
+  const uniqueRecords = {};
+  
+  for (const record of records) {
+    const key = `${record.date}_${record.contract_code}`;
+    
+    if (!uniqueRecords[key]) {
+      uniqueRecords[key] = {
+        date: record.date,
+        contract_code: record.contract_code,
+        rates: [record.rate]
+      };
+    } else {
+      uniqueRecords[key].rates.push(record.rate);
+    }
+  }
+  
+  // Calculate average for each unique combination
+  const deduplicatedRecords = Object.values(uniqueRecords).map(item => ({
+    date: item.date,
+    contract_code: item.contract_code,
+    rate: item.rates.reduce((sum, r) => sum + r, 0) / item.rates.length
+  }));
+  
+  console.log(`   Before deduplication: ${records.length}`);
+  console.log(`   After deduplication: ${deduplicatedRecords.length}`);
+  console.log(`   Removed ${records.length - deduplicatedRecords.length} duplicate entries`);
+  
+  return deduplicatedRecords;
 }
 
 /**
@@ -93,29 +124,35 @@ function parseCSV(filePath) {
 async function clearSimulatedData() {
   console.log('\n🗑️  Step 1: Clearing simulated data from di1_prices...');
   
-  const { data: existingCount } = await supabase
+  const { count: existingCount, error: countError } = await supabase
     .from('di1_prices')
     .select('*', { count: 'exact', head: true });
   
-  console.log(`   Current records in table: ${existingCount}`);
+  if (countError) {
+    console.warn(`   ⚠️  Could not count records: ${countError.message}`);
+  } else {
+    console.log(`   Current records in table: ${existingCount || 0}`);
+  }
   
   if (existingCount === 0) {
     console.log('   ✅ Table already empty, skipping delete');
     return;
   }
   
-  // Delete all records
+  // Delete all records using a more robust method
+  console.log('   🗑️  Deleting all existing records...');
+  
   const { error } = await supabase
     .from('di1_prices')
     .delete()
-    .neq('id', -1); // Delete all records (neq trick to delete everything)
+    .gte('id', 0); // Delete all records with id >= 0 (should be all)
   
   if (error) {
     console.error('   ❌ Failed to delete:', error);
     throw error;
   }
   
-  console.log(`   ✅ Deleted ${existingCount} simulated records`);
+  console.log(`   ✅ Deleted ${existingCount || 'all'} existing records`);
 }
 
 /**
