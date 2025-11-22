@@ -60,9 +60,12 @@ const scanOpportunities = async (supabase) => {
       const longRates = longSeries.map(s => s.rate);
       const cointegrationPValue = checkCointegration(shortRates, longRates);
 
-      let recommendation = 'NEUTRO';
-      if (zScore > 1.5) recommendation = 'VENDER SPREAD';
-      else if (zScore < -1.5) recommendation = 'COMPRAR SPREAD';
+      // Z-score interpretation:
+      // Z > 1.5: Spread is HIGH (above mean) → expect reversion DOWN → SELL SPREAD
+      // Z < -1.5: Spread is LOW (below mean) → expect reversion UP → BUY SPREAD
+      let recommendation = 'NEUTRAL';
+      if (zScore > 1.5) recommendation = 'SELL SPREAD';
+      else if (zScore < -1.5) recommendation = 'BUY SPREAD';
 
       const latestShort = shortSeries[shortSeries.length - 1];
       const latestLong = longSeries[longSeries.length - 1];
