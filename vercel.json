@@ -4,6 +4,12 @@
   "functions": {
     "api/collect-real.js": {
       "maxDuration": 300
+    },
+    "api/backtest.js": {
+      "maxDuration": 60
+    },
+    "api/refresh.js": {
+      "maxDuration": 120
     }
   }
 }
