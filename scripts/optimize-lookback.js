@@ -67,8 +67,8 @@ function calculateMaxDrawdown(equity) {
 async function fetchHistoricalData(shortId, longId) {
   const { data, error } = await supabase
     .from('di1_prices')
-    .select('date, contract, rate')
-    .in('contract', [shortId, longId])
+    .select('date, contract_code, rate')
+    .in('contract_code', [shortId, longId])
     .order('date', { ascending: true });
 
   if (error) throw error;
@@ -79,7 +79,7 @@ async function fetchHistoricalData(shortId, longId) {
     if (!dateMap[row.date]) {
       dateMap[row.date] = {};
     }
-    dateMap[row.date][row.contract] = row.rate;
+    dateMap[row.date][row.contract_code] = row.rate;
   });
 
   // Filter only dates with both contracts
