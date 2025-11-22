@@ -2,10 +2,10 @@
  * BDI Parser - Extração de Dados DI1 de PDFs BDI_05
  * 
  * Extrai dados de contratos DI1 do boletim diário BDI_05 (Clearing) da B3
- * usando pdf-parse e lógica de rolling window para validar contratos
+ * usando unpdf (serverless-optimized PDF parser) e lógica de rolling window para validar contratos
  */
 
-const pdf = require('pdf-parse');
+const { extractText } = require('unpdf');
 const { getActiveContracts } = require('../utils/contract-manager');
 
 /**
@@ -18,11 +18,10 @@ async function parseBDIPDF(pdfBuffer, date) {
   try {
     console.log(`[BDI Parser] Iniciando parse do PDF para ${date}...`);
     
-    // Parse PDF para texto
-    const data = await pdf(pdfBuffer);
-    const text = data.text;
+    // Parse PDF para texto usando unpdf (serverless-optimized, no canvas dependency)
+    const { text, totalPages } = await extractText(pdfBuffer, { mergePages: true });
     
-    console.log(`[BDI Parser] PDF parsed. Total de páginas: ${data.numpages}`);
+    console.log(`[BDI Parser] PDF parsed. Total de páginas: ${totalPages}`);
     
     // Obter contratos ativos para o ano
     const year = new Date(date).getFullYear();

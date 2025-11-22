@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/collect-real.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

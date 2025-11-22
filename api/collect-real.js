@@ -26,16 +26,17 @@ const { getActiveContracts } = require('./utils/contract-manager');
 
 module.exports = async (req, res) => {
   // CORS
+  setCorsHeaders(res);
   if (handleOptions(req, res)) {
     return;
   }
-  setCorsHeaders(res);
   
   const startTime = Date.now();
   console.log('='.repeat(60));
   console.log('📊 COLLECT REAL - Coleta de Dados B3');
   console.log('='.repeat(60));
   
+  // Global try-catch to prevent FUNCTION_INVOCATION_FAILED
   try {
     // 1. Determinar data alvo (usar let para permitir fallback)
     const originalDate = req.query.date || getLastBusinessDay();
