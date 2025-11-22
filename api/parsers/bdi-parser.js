@@ -25,6 +25,15 @@ async function parseBDIPDF(pdfBuffer, date) {
     const { text, totalPages } = await extractText(uint8Array, { mergePages: true });
     
     console.log(`[BDI Parser] PDF parsed. Total de páginas: ${totalPages}`);
+    console.log(`[BDI Parser] Tamanho do texto extraído: ${text.length} caracteres`);
+    
+    // Debug: mostrar primeiras linhas do texto extraído
+    if (text.length > 0) {
+      const preview = text.substring(0, 500);
+      console.log(`[BDI Parser] Preview do texto:\n${preview}\n---`);
+    } else {
+      console.error(`[BDI Parser] ⚠️ PDF vazio! Nenhum texto foi extraído.`);
+    }
     
     // Obter contratos ativos para o ano
     const year = new Date(date).getFullYear();
