@@ -12,7 +12,7 @@ const {
 } = require('../lib/utils');
 
 // Get historical data from database
-const getHistoricalData = async (supabase, contractCode, days = 100) => {
+const getHistoricalData = async (supabase, contractCode, days = 60) => {
   const { data, error } = await supabase
     .from('di1_prices')
     .select('date, rate')
@@ -37,8 +37,9 @@ const scanOpportunities = async (supabase) => {
       const short = AVAILABLE_MATURITIES[i];
       const long = AVAILABLE_MATURITIES[j];
 
-      const shortSeries = await getHistoricalData(supabase, short.id, 100);
-      const longSeries = await getHistoricalData(supabase, long.id, 100);
+      const LOOKBACK = 30; // Lookback window for z-score calculation (optimized)
+      const shortSeries = await getHistoricalData(supabase, short.id, LOOKBACK + 10);
+      const longSeries = await getHistoricalData(supabase, long.id, LOOKBACK + 10);
 
       if (shortSeries.length === 0 || longSeries.length === 0) {
         continue;
@@ -51,9 +52,11 @@ const scanOpportunities = async (supabase) => {
 
       if (spreads.length < 20) continue;
 
-      const meanSpread = calculateMean(spreads);
-      const stdDevSpread = calculateStdDev(spreads, meanSpread);
-      const currentSpread = spreads[spreads.length - 1];
+      // Use only last LOOKBACK days for z-score calculation
+      const recentSpreads = spreads.slice(-LOOKBACK);
+      const meanSpread = calculateMean(recentSpreads);
+      const stdDevSpread = calculateStdDev(recentSpreads, meanSpread);
+      const currentSpread = recentSpreads[recentSpreads.length - 1];
       const zScore = calculateZScore(currentSpread, meanSpread, stdDevSpread);
 
       const shortRates = shortSeries.map(s => s.rate);

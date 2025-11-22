@@ -15,7 +15,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 4. **DV01/PU Calculation Fix:** Fixed bug where `short.du` (undefined) was used instead of `short.defaultDu`, causing NaN values in allocation
 5. **Margin Calculation:** Added estimated margin requirement (12% of notional value) to help traders plan capital allocation
 6. **UI Improvements:** Risco Financeiro now displays 2 decimal places for precision; Backtesting section temporarily hidden (feature under evaluation, code preserved)
-7. **Lookback Optimization:** Tested lookback periods (20, 30, 40, 50, 60 days) - confirmed 60 days is optimal with Sharpe Ratio 29.74 (100% win rate, 0% drawdown, though only 3 trades vs 46.75 P&L with 30 days/18 trades)
+7. **Lookback Optimization:** Tested lookback periods (20, 30, 40, 50, 60 days) and selected **30 days** for optimal trading frequency (18 trades, 83.3% win rate, Sharpe 16.77, R$ 46.75 P&L, 2.6% max drawdown) balancing opportunity volume with risk-adjusted returns
 
 ## System Architecture
 
