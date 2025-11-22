@@ -3,15 +3,18 @@
  * 
  * Coleta dados reais DI1 da API REST da B3 (TEMPO REAL APENAS)
  * 
- * IMPORTANTE: A API B3 retorna APENAS dados atuais do mercado.
- * Para dados históricos, use scripts/import-real-data.cjs
+ * IMPORTANTE: 
+ * - A API B3 retorna APENAS dados atuais do mercado.
+ * - Usa APENAS contratos DI1F (convenção Janeiro com F, ignora DI1J)
+ * - Para dados históricos, use scripts/import-real-data.cjs
  * 
  * Processo:
  *   1. Usa data atual (hoje)
- *   2. Busca dados via API REST B3
- *   3. Validação (mínimo 7/9 contratos)
- *   4. UPSERT batch no Supabase (com deduplicação)
- *   5. Registro de metadata
+ *   2. Busca dados via API REST B3 (filtra apenas DI1F)
+ *   3. Forward-fill: Contratos faltantes repetem cotação do dia anterior
+ *   4. Validação (mínimo 7/9 contratos)
+ *   5. UPSERT batch no Supabase (com deduplicação)
+ *   6. Registro de metadata
  * 
  * Retorno:
  *   {success: true, date: '2025-11-22', records: 9, source: 'b3_api'}
@@ -69,9 +72,48 @@ module.exports = async (req, res) => {
     for (const item of di1DataRaw) {
       di1DataMap.set(item.contract_code, item);
     }
-    const di1Data = Array.from(di1DataMap.values());
+    let di1Data = Array.from(di1DataMap.values());
     console.log(`   ${di1DataRaw.length} registros → ${di1Data.length} únicos`);
     console.log('');
+    
+    // 3.5. Forward-fill: Buscar contratos faltantes no dia anterior
+    const foundContracts = di1Data.map(d => d.contract_code);
+    const missingContracts = expectedContracts.filter(c => !foundContracts.includes(c));
+    
+    if (missingContracts.length > 0) {
+      console.log('🔄 Step 2.5: Forward-fill para contratos faltantes...');
+      console.log(`   Contratos não negociados hoje: ${missingContracts.join(', ')}`);
+      
+      // Buscar cotação mais recente de CADA contrato faltante (queries individuais)
+      const supabase = getSupabaseClient();
+      const fillCount = {filled: 0, missing: 0};
+      
+      for (const contract of missingContracts) {
+        const { data: prevData, error: prevError } = await supabase
+          .from('di1_prices')
+          .select('rate, date')
+          .eq('contract_code', contract)
+          .order('date', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (prevError || !prevData) {
+          console.warn(`   ⚠️  ${contract}: Sem dados anteriores disponíveis no banco`);
+          fillCount.missing++;
+        } else {
+          di1Data.push({
+            date: targetDate,
+            contract_code: contract,
+            rate: prevData.rate
+          });
+          console.log(`   ✓ ${contract}: ${prevData.rate.toFixed(4)}% (forward-fill de ${prevData.date})`);
+          fillCount.filled++;
+        }
+      }
+      
+      console.log(`   Forward-fill: ${fillCount.filled} aplicados, ${fillCount.missing} sem histórico`);
+      console.log('');
+    }
     
     // 4. Validação
     console.log('✅ Step 3: Validação...');

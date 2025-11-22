@@ -71,19 +71,17 @@ function extractDI1Data(securities, date) {
   
   // Mapear contratos da API
   for (const security of securities) {
-    // O código está no campo 'symb' (ex: DI1J30)
-    const apiSymbol = security.symb;
+    // O código está no campo 'symb' (ex: DI1F30, DI1J30, DI1V29, etc)
+    const contractCode = security.symb;
     
-    if (!apiSymbol || !apiSymbol.startsWith('DI1')) {
+    // Filtrar APENAS contratos DI1F (janeiro com F)
+    // API retorna DI1F E DI1J para janeiro - usamos apenas DI1F
+    if (!contractCode || !contractCode.startsWith('DI1F')) {
       continue;
     }
     
-    // Converter formato API (DI1J30) para nosso formato (DI1F30)
-    // J = Janeiro (todos os DI1 vencem em Janeiro)
-    const normalizedSymbol = apiSymbol.replace('DI1J', 'DI1F');
-    
     // Verificar se é um contrato ativo
-    if (!activeContracts.includes(normalizedSymbol)) {
+    if (!activeContracts.includes(contractCode)) {
       continue;
     }
     
@@ -91,23 +89,23 @@ function extractDI1Data(securities, date) {
     const currentPrice = security.SctyQtn?.curPrc;
     
     if (!currentPrice || typeof currentPrice !== 'number') {
-      console.warn(`[B3 API]   ⚠️  ${normalizedSymbol}: Sem preço disponível`);
+      console.warn(`[B3 API]   ⚠️  ${contractCode}: Sem preço disponível`);
       continue;
     }
     
     // Validar taxa (razoabilidade: 5% a 30%)
     if (currentPrice < 5.0 || currentPrice > 30.0) {
-      console.warn(`[B3 API]   ⚠️  ${normalizedSymbol}: Taxa fora do range ${currentPrice}% (esperado: 5-30%)`);
+      console.warn(`[B3 API]   ⚠️  ${contractCode}: Taxa fora do range ${currentPrice}% (esperado: 5-30%)`);
       continue;
     }
     
     results.push({
       date: date,
-      contract_code: normalizedSymbol,
+      contract_code: contractCode,
       rate: currentPrice
     });
     
-    console.log(`[B3 API]   ✓ ${normalizedSymbol}: ${currentPrice.toFixed(4)}%`);
+    console.log(`[B3 API]   ✓ ${contractCode}: ${currentPrice.toFixed(4)}%`);
   }
   
   // Identificar contratos faltantes

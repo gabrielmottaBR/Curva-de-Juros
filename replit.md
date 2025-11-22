@@ -48,17 +48,20 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ### Key Features
 1.  **Automated Data Collection:** Real-time collection via B3 REST API (current market data only).
-2.  **Historical Database:** Persistent storage of DI1 prices in Supabase.
-3.  **Pre-calculated Opportunities:** Backend processes all calculations and caches results.
-4.  **Statistical Analysis:** Calculates spreads, z-scores, and cointegration.
-5.  **Visual Analytics:** Interactive charts for historical spreads.
-6.  **Risk Management:** DV01 calculations and position sizing.
-7.  **Opportunity Scanner:** Identifies arbitrage opportunities across maturities.
-8.  **REST API:** Provides a clean interface for frontend-backend communication.
-9.  **Dynamic Contract Selection:** Rolling window logic (year+2 to year+10) automatically adjusts active contracts.
+2.  **Forward-Fill Logic:** Contratos não negociados no dia repetem a cotação do dia anterior automaticamente.
+3.  **Historical Database:** Persistent storage of DI1 prices in Supabase.
+4.  **Pre-calculated Opportunities:** Backend processes all calculations and caches results.
+5.  **Statistical Analysis:** Calculates spreads, z-scores, and cointegration.
+6.  **Visual Analytics:** Interactive charts for historical spreads.
+7.  **Risk Management:** DV01 calculations and position sizing.
+8.  **Opportunity Scanner:** Identifies arbitrage opportunities across maturities.
+9.  **REST API:** Provides a clean interface for frontend-backend communication.
+10. **Dynamic Contract Selection:** Rolling window logic (year+2 to year+10) automatically adjusts active contracts.
 
 ### Important Limitations
 - **B3 REST API:** Returns ONLY current market data (real-time). Cannot fetch historical data.
+- **Contract Format:** API retorna DI1F E DI1J para Janeiro - sistema usa apenas **DI1F** (convenção fixada).
+- **Missing Contracts:** Se um contrato DI1F não for negociado no dia, o sistema repete automaticamente a cotação do dia anterior (forward-fill).
 - **Historical Backfill:** Use `scripts/import-real-data.cjs` for importing past dates via rb3 CSV files.
 
 ### Data Flow
