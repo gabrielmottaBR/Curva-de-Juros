@@ -2,10 +2,7 @@
  * B3 Calendar - Calendário de Dias Úteis da B3
  * 
  * Gerencia feriados da B3 e cálculo de dias úteis
- * Reutiliza lógica existente de api/utils.js
  */
-
-const { calculateBusinessDays, formatDateBR } = require('./utils');
 
 // Feriados B3 2025-2030 (expandir conforme necessário)
 const B3_HOLIDAYS = {
