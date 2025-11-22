@@ -59,7 +59,13 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 8.  **Opportunity Scanner:** Identifies arbitrage opportunities across maturities.
 9.  **REST API:** Provides a clean interface for frontend-backend communication.
 10. **Dynamic Contract Selection:** Rolling window logic (year+2 to year+10) automatically adjusts active contracts.
-11. **Historical Backtesting:** Interactive simulation with configurable date ranges, entry/exit based on z-scores (|z| > 2.0 entry, |z| < 0.5 exit), displays metrics (win rate, P&L, Sharpe ratio, max drawdown), equity curve visualization, and trade history table.
+11. **Historical Backtesting:** Interactive simulation with configurable parameters:
+    - **Date Range:** User-selected start/end dates from database (oldest to D-1)
+    - **Trade Type Filter:** BOTH (all trades), LONG (only buys when z < 0), SHORT (only sells when z > 0)
+    - **Risk Sizing:** Financial risk per trade (R$ 100 - 1,000,000) for position sizing
+    - **Entry/Exit Rules:** Entry when |z| > 2.0, exit when |z| < 0.5
+    - **P&L Conversion:** Spread changes in bps converted to R$ using simplified formula (1 bps = risk/100 R$)
+    - **Results Display:** Metrics (win rate, P&L total/average in R$, Sharpe ratio, max drawdown), equity curve (R$), configuration summary, trade history with dual P&L display (R$ + bps)
 12. **Smart Date Selection:** Automatically loads available date ranges from database (oldest to D-1), with edge-case protection for single-day datasets.
 
 ### Important Limitations
