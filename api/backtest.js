@@ -6,6 +6,8 @@
  * Query params:
  *   - start_date: Data inicial (YYYY-MM-DD)
  *   - end_date: Data final (YYYY-MM-DD)
+ *   - trade_type: Tipo de operação ('BOTH', 'LONG', 'SHORT') [padrão: 'BOTH']
+ *   - risk_per_trade: Risco financeiro por operação em R$ [padrão: 10000]
  *   - pair_id: (opcional) Par específico para backtesting
  * 
  * Retorna:
@@ -22,7 +24,16 @@ module.exports = async (req, res) => {
   if (handleOptions(req, res)) return;
 
   try {
-    const { start_date, end_date, pair_id } = req.query;
+    const { 
+      start_date, 
+      end_date, 
+      pair_id,
+      trade_type = 'BOTH',
+      risk_per_trade = '10000'
+    } = req.query;
+    
+    const tradeTypeFilter = trade_type.toUpperCase();
+    const riskAmount = parseFloat(risk_per_trade);
 
     // Validações
     if (!start_date || !end_date) {
@@ -31,10 +42,26 @@ module.exports = async (req, res) => {
         error: 'Missing start_date or end_date parameters'
       });
     }
+    
+    if (isNaN(riskAmount) || riskAmount < 100 || riskAmount > 1000000) {
+      return res.status(400).json({
+        success: false,
+        error: 'risk_per_trade must be between R$ 100 and R$ 1,000,000'
+      });
+    }
+    
+    if (!['BOTH', 'LONG', 'SHORT'].includes(tradeTypeFilter)) {
+      return res.status(400).json({
+        success: false,
+        error: 'trade_type must be BOTH, LONG, or SHORT'
+      });
+    }
 
     const supabase = getSupabaseClient();
 
     console.log(`[Backtest] Período: ${start_date} a ${end_date}`);
+    console.log(`[Backtest] Tipo de Trade: ${tradeTypeFilter}`);
+    console.log(`[Backtest] Risco por Trade: R$ ${riskAmount.toFixed(2)}`);
     if (pair_id) console.log(`[Backtest] Par específico: ${pair_id}`);
 
     // Buscar oportunidades históricas do cache
@@ -111,7 +138,12 @@ module.exports = async (req, res) => {
           if (Math.abs(currentZScore) < EXIT_THRESHOLD) {
             // Fechar posição
             const spreadChange = currentSpread - position.entry_spread;
-            const pnl = position.type === 'BUY' ? spreadChange : -spreadChange;
+            const pnlBps = position.type === 'BUY' ? spreadChange : -spreadChange;
+            
+            // Converter P&L de bps para R$ baseado no risco
+            // Simplificação: 1 bps de spread = (risk_amount / 100) em R$
+            // Isso significa que um movimento de 100 bps gera ganho/perda igual ao risco configurado
+            const pnlReais = pnlBps * (position.risk_amount / 100);
 
             trades.push({
               pair: pairKey,
@@ -122,24 +154,35 @@ module.exports = async (req, res) => {
               entry_zscore: position.entry_zscore,
               exit_zscore: currentZScore,
               type: position.type,
-              pnl: pnl
+              pnl: pnlReais,
+              pnl_bps: pnlBps
             });
 
-            dailyPnLAmount += pnl;
+            dailyPnLAmount += pnlReais;
             openPositions.delete(pairKey);
-            console.log(`[Backtest] ${date} - FECHAR ${position.type} ${pairKey}: P&L = ${pnl.toFixed(2)} bps`);
+            console.log(`[Backtest] ${date} - FECHAR ${position.type} ${pairKey}: P&L = ${pnlBps.toFixed(2)} bps (R$ ${pnlReais.toFixed(2)})`);
           }
         } else {
           // Verificar entrada de nova posição
           if (Math.abs(currentZScore) > ENTRY_THRESHOLD) {
             const tradeType = currentZScore > 0 ? 'SELL' : 'BUY';
-            openPositions.set(pairKey, {
-              entry_spread: currentSpread,
-              entry_zscore: currentZScore,
-              entry_date: date,
-              type: tradeType
-            });
-            console.log(`[Backtest] ${date} - ABRIR ${tradeType} ${pairKey}: Spread = ${currentSpread.toFixed(2)}, Z = ${currentZScore.toFixed(2)}`);
+            
+            // Filtrar por tipo de trade selecionado
+            const shouldEnter = 
+              tradeTypeFilter === 'BOTH' ||
+              (tradeTypeFilter === 'LONG' && tradeType === 'BUY') ||
+              (tradeTypeFilter === 'SHORT' && tradeType === 'SELL');
+            
+            if (shouldEnter) {
+              openPositions.set(pairKey, {
+                entry_spread: currentSpread,
+                entry_zscore: currentZScore,
+                entry_date: date,
+                type: tradeType,
+                risk_amount: riskAmount
+              });
+              console.log(`[Backtest] ${date} - ABRIR ${tradeType} ${pairKey}: Spread = ${currentSpread.toFixed(2)}, Z = ${currentZScore.toFixed(2)}, Risco = R$ ${riskAmount.toFixed(2)}`);
+            }
           }
         }
       }
@@ -174,7 +217,7 @@ module.exports = async (req, res) => {
       if (drawdown > maxDrawdown) maxDrawdown = drawdown;
     }
 
-    console.log(`[Backtest] Concluído: ${totalTrades} trades, Win Rate = ${winRate.toFixed(1)}%, P&L = ${totalPnL.toFixed(2)} bps`);
+    console.log(`[Backtest] Concluído: ${totalTrades} trades, Win Rate = ${winRate.toFixed(1)}%, P&L = R$ ${totalPnL.toFixed(2)}`);
 
     res.json({
       success: true,
@@ -189,7 +232,11 @@ module.exports = async (req, res) => {
         sharpe_ratio: sharpeRatio,
         max_drawdown: maxDrawdown
       },
-      equity_curve: dailyPnL
+      equity_curve: dailyPnL,
+      config: {
+        trade_type: tradeTypeFilter,
+        risk_per_trade: riskAmount
+      }
     });
 
   } catch (error) {
