@@ -4,9 +4,14 @@
 This is a full-stack React + TypeScript + Vite + Express + Supabase application designed to analyze Brazilian interest rate curves (DI1 futures) and identify spread arbitrage opportunities. It collects real market data from B3, performs statistical analysis, and provides real-time trading insights through a responsive web interface. The project aims to deliver a robust, production-ready system for financial market analysis, utilizing 100% real B3 data.
 
 ## User Preferences
-- **Language:** Portuguese (Brazil)
+- **Language:** Portuguese (Brazil) for UI, English for API/backend enums
 - **Architecture:** Backend-heavy processing, lightweight frontend
 - **Data Source:** Prioritize real B3 data, fallback to simulated when unavailable
+
+## Recent Changes (2025-11-22)
+1. **Threshold Adjustment:** Entry threshold reduced from 2.0 to 1.5 (exit remains 0.5) to capture real market opportunities
+2. **Backtest Refactoring:** Changed from cache-based to on-the-fly calculation from di1_prices for historical accuracy
+3. **Signal Standardization:** Fixed backend/frontend mismatch - recommendations now use English enums consistently (BUY SPREAD, SELL SPREAD, NEUTRAL)
 
 ## System Architecture
 
