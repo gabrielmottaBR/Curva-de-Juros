@@ -18,7 +18,7 @@
  *   {success: true, date: '2025-11-19', records: 9, source: 'bdi_pdf'}
  */
 
-const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../lib/_shared');
 const { downloadBDIPDF, getBDIPDFUrl } = require('./utils/pdf-downloader');
 const { parseBDIPDF, validateExtractedData } = require('./parsers/bdi-parser');
 const { getLastBusinessDay } = require('./utils/b3-calendar');

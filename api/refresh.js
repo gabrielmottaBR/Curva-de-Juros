@@ -1,6 +1,6 @@
 // api/refresh.js - Lightweight recalculation using existing data
 
-const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../lib/_shared');
 const {
   AVAILABLE_MATURITIES,
   calculatePU,
@@ -9,7 +9,7 @@ const {
   calculateStdDev,
   calculateZScore,
   checkCointegration
-} = require('./utils');
+} = require('../lib/utils');
 
 // Get historical data from database
 const getHistoricalData = async (supabase, contractCode, days = 100) => {

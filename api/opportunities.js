@@ -1,6 +1,6 @@
 // api/opportunities.js - List all opportunities
 
-const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../lib/_shared');
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);

@@ -1,6 +1,6 @@
 // api/pair/[pairId].js - Get pair details
 
-const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../_shared');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../../lib/_shared');
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);

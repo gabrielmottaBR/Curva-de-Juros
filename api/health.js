@@ -1,6 +1,6 @@
 // api/health.js - Health check endpoint
 
-const { setCorsHeaders, handleOptions } = require('./_shared');
+const { setCorsHeaders, handleOptions } = require('../lib/_shared');
 
 module.exports = async (req, res) => {
   setCorsHeaders(res);
