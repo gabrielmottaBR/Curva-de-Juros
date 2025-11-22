@@ -6,7 +6,34 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Current State:** Full-stack implementation with backend processing, database persistence, and automated daily data collection. **System now uses 100% real B3 data collected via rb3 R package.**
 
 ## Recent Changes
-- **2025-11-21 (Latest Session - PRODUCTION-READY REAL B3 DATA BACKFILL):** Successfully replaced simulated data with 100% real B3 historical data + production safety improvements
+- **2025-11-22 (Latest Session - AUTOMATED BDI PDF COLLECTION SYSTEM):** Implemented fully automated daily collection from B3 BDI PDF files
+  - ✅ Created **6 core components** for automated collection system:
+    - `api/utils/contract-manager.js` - Rolling window logic (always 9 contracts: year+2 to year+10)
+    - `api/utils/b3-calendar.js` - Business day calculations with B3 holiday calendar
+    - `api/utils/pdf-downloader.js` - PDF download with 3-retry exponential backoff
+    - `api/parsers/bdi-parser.js` - DI1 data extraction from BDI_05 PDF using pdf-parse
+    - `api/collect-real.js` - Main endpoint with UPSERT, validation, audit trail
+    - `scripts/test-collect-real.js` - Local testing script
+  - ✅ **Rolling Window Contract Selection:**
+    - 2025: DI1F27 → DI1F35 (Jan/2027 to Jan/2035)
+    - 2026: DI1F28 → DI1F36 (Jan/2028 to Jan/2036) - auto-updates by year
+    - Always 9 contracts spanning 8 years (dynamic per current year)
+  - ✅ **Production-Grade Features:**
+    - UPSERT-based deduplication (constraint: contract_code + date)
+    - Minimum 7/9 contracts validation before import
+    - Full audit trail via import_metadata table (source_type='bdi_pdf')
+    - Automatic fallback to previous business day if PDF unavailable
+    - Comprehensive logging and error handling
+  - ✅ **Vercel Configuration:**
+    - Updated vercel.json with 60s maxDuration for api/collect-real.js
+    - Ready for GitHub Actions daily cron (0:00 UTC = 21:00 BRT)
+  - ✅ **Documentation:**
+    - Created `AUTOMATED_COLLECTION.md` with complete GitHub Actions setup guide
+    - Updated `.gitignore` to exclude `.github/workflows/` (manual setup required)
+  - **PDF Source:** https://arquivos.b3.com.br/bdi/download/bdi/YYYY-MM-DD/BDI_05_YYYYMMDD.pdf
+  - **System Status:** Ready for deployment and automated daily collection
+
+- **2025-11-21 (Earlier - PRODUCTION-READY REAL B3 DATA BACKFILL):** Successfully replaced simulated data with 100% real B3 historical data + production safety improvements
   - ✅ Created `scripts/import-real-data.js` for importing rb3 CSV data into Supabase
   - ✅ User executed R script locally using rb3 package to collect real B3 data
   - ✅ Imported **963 unique records** (2025-06-24 to 2025-11-19, ~107 business days)

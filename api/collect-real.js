@@ -18,7 +18,7 @@
  *   {success: true, date: '2025-11-19', records: 9, source: 'bdi_pdf'}
  */
 
-const { getSupabaseClient, corsHeaders } = require('./_shared');
+const { getSupabaseClient, setCorsHeaders, handleOptions } = require('./_shared');
 const { downloadBDIPDF, getBDIPDFUrl } = require('./utils/pdf-downloader');
 const { parseBDIPDF, validateExtractedData } = require('./parsers/bdi-parser');
 const { getLastBusinessDay } = require('./utils/b3-calendar');
@@ -26,9 +26,10 @@ const { getActiveContracts } = require('./utils/contract-manager');
 
 module.exports = async (req, res) => {
   // CORS
-  if (req.method === 'OPTIONS') {
-    return res.status(200).json(corsHeaders);
+  if (handleOptions(req, res)) {
+    return;
   }
+  setCorsHeaders(res);
   
   const startTime = Date.now();
   console.log('='.repeat(60));
@@ -36,10 +37,11 @@ module.exports = async (req, res) => {
   console.log('='.repeat(60));
   
   try {
-    // 1. Determinar data alvo
-    const targetDate = req.query.date || getLastBusinessDay();
-    const year = new Date(targetDate).getFullYear();
-    const expectedContracts = getActiveContracts(year);
+    // 1. Determinar data alvo (usar let para permitir fallback)
+    const originalDate = req.query.date || getLastBusinessDay();
+    let targetDate = originalDate;
+    let year = new Date(targetDate).getFullYear();
+    let expectedContracts = getActiveContracts(year);
     
     console.log(`📅 Data alvo: ${targetDate}`);
     console.log(`📋 Contratos esperados (${year}): ${expectedContracts.join(', ')}`);
@@ -47,7 +49,7 @@ module.exports = async (req, res) => {
     
     // 2. Download PDF
     console.log('📥 Step 1: Download PDF BDI_05...');
-    const pdfUrl = getBDIPDFUrl(targetDate);
+    let pdfUrl = getBDIPDFUrl(targetDate);
     console.log(`   URL: ${pdfUrl}`);
     
     let pdfBuffer;
@@ -62,15 +64,20 @@ module.exports = async (req, res) => {
       
       try {
         pdfBuffer = await downloadBDIPDF(previousDay, 2);
-        // Se sucesso, atualizar targetDate
+        
+        // Atualizar todas variáveis dependentes da data
         targetDate = previousDay;
+        year = new Date(targetDate).getFullYear();
+        expectedContracts = getActiveContracts(year);
+        pdfUrl = getBDIPDFUrl(targetDate);
+        
         console.log(`✅ Sucesso com ${previousDay}`);
       } catch (retryError) {
         return res.status(404).json({
           success: false,
           error: 'PDF não encontrado',
-          message: `Não foi possível baixar PDF para ${targetDate} ou ${previousDay}`,
-          url: pdfUrl
+          message: `Não foi possível baixar PDF para ${originalDate} ou ${previousDay}`,
+          url: getBDIPDFUrl(originalDate)
         });
       }
     }
@@ -123,6 +130,9 @@ module.exports = async (req, res) => {
     console.log('📝 Step 5: Registrando metadata...');
     
     const rates = di1Data.map(d => d.rate);
+    const actualContracts = di1Data.map(d => d.contract_code);
+    const fallbackUsed = targetDate !== originalDate;
+    
     const metadata = {
       source_type: 'bdi_pdf',
       source_file: `BDI_05_${targetDate.replace(/-/g, '')}.pdf`,
@@ -133,11 +143,11 @@ module.exports = async (req, res) => {
       date_range_start: targetDate,
       date_range_end: targetDate,
       contracts_count: di1Data.length,
-      contracts_list: di1Data.map(d => d.contract_code).join(', '),
+      contracts_list: actualContracts.join(', '),
       rate_min: Math.min(...rates),
       rate_max: Math.max(...rates),
       dedup_strategy: 'none',
-      notes: `Automated collection from B3 BDI_05 PDF. Rolling window: ${expectedContracts[0]}-${expectedContracts[expectedContracts.length - 1]}`
+      notes: `Automated collection from B3 BDI_05 PDF. Imported: ${actualContracts[0]}-${actualContracts[actualContracts.length - 1]} (${actualContracts.length}/${expectedContracts.length} contracts)${fallbackUsed ? `. Fallback from ${originalDate} to ${targetDate}` : ''}`
     };
     
     const { error: metadataError } = await supabase
