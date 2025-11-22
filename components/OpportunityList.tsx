@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Opportunity } from '../types';
 
 interface OpportunityListProps {
@@ -7,7 +8,60 @@ interface OpportunityListProps {
   onSelect: (opp: Opportunity) => void;
 }
 
+type SortColumn = 'spread' | 'zscore' | 'signal' | null;
+type SortDirection = 'asc' | 'desc';
+
 const OpportunityList: React.FC<OpportunityListProps> = ({ opportunities, selectedId, onSelect }) => {
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Função de ordenação
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction se clicar na mesma coluna
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Nova coluna: default desc
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Ordenar oportunidades
+  const sortedOpportunities = useMemo(() => {
+    if (!sortColumn) return opportunities;
+
+    return [...opportunities].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortColumn) {
+        case 'spread':
+          comparison = a.currentSpread - b.currentSpread;
+          break;
+        case 'zscore':
+          comparison = Math.abs(a.zScore) - Math.abs(b.zScore);
+          break;
+        case 'signal':
+          // Ordenar por tipo de sinal: BUY > SELL > NEUTRAL
+          const signalOrder = { 'BUY SPREAD': 2, 'SELL SPREAD': 1, 'NEUTRAL': 0 };
+          comparison = signalOrder[a.recommendation] - signalOrder[b.recommendation];
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [opportunities, sortColumn, sortDirection]);
+
+  // Componente de ícone de ordenação
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-600" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-3 h-3 text-emerald-400" />
+      : <ArrowDown className="w-3 h-3 text-emerald-400" />;
+  };
+
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden mb-8 shadow-lg">
       <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
@@ -15,7 +69,7 @@ const OpportunityList: React.FC<OpportunityListProps> = ({ opportunities, select
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
           Resultados Obtidos
         </h3>
-        <span className="text-xs text-slate-500">{opportunities.length} combinations analyzed</span>
+        <span className="text-xs text-slate-500">{opportunities.length} combinações analisadas</span>
       </div>
       
       <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
@@ -23,14 +77,38 @@ const OpportunityList: React.FC<OpportunityListProps> = ({ opportunities, select
           <thead className="bg-slate-900/80 text-xs uppercase text-slate-400 sticky top-0 z-10 backdrop-blur-sm">
             <tr>
               <th className="px-4 py-3 font-medium">Pair (Short x Long)</th>
-              <th className="px-4 py-3 font-medium text-right">Spread (bps)</th>
-              <th className="px-4 py-3 font-medium text-right">Z-Score</th>
-              <th className="px-4 py-3 font-medium text-center">Sinal</th>
+              <th 
+                className="px-4 py-3 font-medium text-right cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={() => handleSort('spread')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Spread (bps)
+                  <SortIcon column="spread" />
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 font-medium text-right cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={() => handleSort('zscore')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Z-Score
+                  <SortIcon column="zscore" />
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 font-medium text-center cursor-pointer hover:text-emerald-400 transition-colors"
+                onClick={() => handleSort('signal')}
+              >
+                <div className="flex items-center justify-center gap-1">
+                  Sinal
+                  <SortIcon column="signal" />
+                </div>
+              </th>
               <th className="px-4 py-3 font-medium text-right">Processo</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50 text-sm">
-            {opportunities.map((opp) => {
+            {sortedOpportunities.map((opp) => {
               const isSelected = selectedId === opp.id;
               const isBuy = opp.recommendation === 'BUY SPREAD';
               const isSell = opp.recommendation === 'SELL SPREAD';

@@ -30,12 +30,12 @@ const Header: React.FC<HeaderProps> = ({ onOpenEdu, connectionStatus = 'LIVE' })
             {isLive ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                CONEXÃO B3: Dados de Fechamento de D-1
+                DADOS CONECTADOS
               </>
             ) : (
               <>
                  <DatabaseZap className="w-3 h-3" />
-                 CONEXÃO B3: MODO SIMULADO (FALLBACK)
+                 MODO SIMULADO (FALLBACK)
               </>
             )}
           </div>
