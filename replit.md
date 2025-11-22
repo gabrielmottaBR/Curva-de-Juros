@@ -14,6 +14,7 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 3. **Signal Standardization:** Fixed backend/frontend mismatch - recommendations now use English enums consistently (BUY SPREAD, SELL SPREAD, NEUTRAL)
 4. **DV01/PU Calculation Fix:** Fixed bug where `short.du` (undefined) was used instead of `short.defaultDu`, causing NaN values in allocation
 5. **Margin Calculation:** Added estimated margin requirement (12% of notional value) to help traders plan capital allocation
+6. **UI Improvements:** Risco Financeiro now displays 2 decimal places for precision; Backtesting section temporarily hidden (feature under evaluation, code preserved)
 
 ## System Architecture
 

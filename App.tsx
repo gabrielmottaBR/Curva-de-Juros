@@ -162,12 +162,12 @@ const App: React.FC = () => {
            )}
         </div>
 
-        {/* Section 1.5: Backtesting */}
-        {!isLoadingScanner && (
+        {/* Section 1.5: Backtesting - HIDDEN (feature under evaluation) */}
+        {/* {!isLoadingScanner && (
           <div className="mb-8">
             <BacktestPanel />
           </div>
-        )}
+        )} */}
 
         {/* Section 2: Detailed Dashboard (Only visible when selected) */}
         {selectedOpportunity && detailedOpportunity && calculationResult && allocation ? (

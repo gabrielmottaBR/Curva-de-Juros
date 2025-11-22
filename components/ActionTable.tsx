@@ -86,7 +86,7 @@ const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel,
             </div>
             <div>
                 <div className="text-xs text-slate-400">Risco Financeiro</div>
-                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk?.toLocaleString() || '0'}</div>
+                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}</div>
             </div>
         </div>
         
