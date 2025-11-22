@@ -2,11 +2,16 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/**/*.js": {
+      "excludeFiles": "node_modules/canvas/**"
+    },
     "api/refresh.js": {
-      "maxDuration": 15
+      "maxDuration": 15,
+      "excludeFiles": "node_modules/canvas/**"
     },
     "api/collect-real.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "excludeFiles": "node_modules/canvas/**"
     }
   }
 }
