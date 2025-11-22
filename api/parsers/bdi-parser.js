@@ -18,8 +18,11 @@ async function parseBDIPDF(pdfBuffer, date) {
   try {
     console.log(`[BDI Parser] Iniciando parse do PDF para ${date}...`);
     
+    // Convert Buffer to Uint8Array for unpdf compatibility
+    const uint8Array = new Uint8Array(pdfBuffer);
+    
     // Parse PDF para texto usando unpdf (serverless-optimized, no canvas dependency)
-    const { text, totalPages } = await extractText(pdfBuffer, { mergePages: true });
+    const { text, totalPages } = await extractText(uint8Array, { mergePages: true });
     
     console.log(`[BDI Parser] PDF parsed. Total de páginas: ${totalPages}`);
     
