@@ -14,11 +14,11 @@ jobs:
     timeout-minutes: 5
     
     steps:
-      - name: Step 1 - Collect data
-        timeout-minutes: 2
+      - name: Step 1 - Collect B3 Real Data
+        timeout-minutes: 6
         continue-on-error: false
         run: |
-          echo "📊 Step 1: Collecting data..."
+          echo "📊 Step 1: Collecting B3 real data from BDI PDF..."
           
           MAX_RETRIES=3
           RETRY_DELAY=30
@@ -27,7 +27,7 @@ jobs:
             echo "Attempt $attempt/$MAX_RETRIES..."
             
             response=$(curl -s -w "\n%{http_code}" -X POST \
-              https://curvadejuros.vercel.app/api/collect-simple)
+              https://curvadejuros.vercel.app/api/collect-real)
             
             http_code=$(echo "$response" | tail -n1)
             body=$(echo "$response" | head -n-1)
