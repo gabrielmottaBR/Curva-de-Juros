@@ -18,6 +18,21 @@
 
 const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../lib/_shared');
 
+// Funções auxiliares para cálculo de z-score
+function calculateMean(values) {
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function calculateStdDev(values, mean) {
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function calculateZScore(value, mean, stdDev) {
+  if (stdDev === 0) return 0;
+  return (value - mean) / stdDev;
+}
+
 module.exports = async (req, res) => {
   // Handle CORS
   setCorsHeaders(res);
@@ -58,32 +73,28 @@ module.exports = async (req, res) => {
     }
 
     const supabase = getSupabaseClient();
+    const LOOKBACK = 60; // Janela para calcular z-score
 
     console.log(`[Backtest] Período: ${start_date} a ${end_date}`);
     console.log(`[Backtest] Tipo de Trade: ${tradeTypeFilter}`);
     console.log(`[Backtest] Risco por Trade: R$ ${riskAmount.toFixed(2)}`);
+    console.log(`[Backtest] Lookback: ${LOOKBACK} dias`);
     if (pair_id) console.log(`[Backtest] Par específico: ${pair_id}`);
 
-    // Buscar oportunidades históricas do cache
-    let query = supabase
-      .from('opportunities_cache')
+    // Buscar preços históricos de di1_prices
+    const { data: prices, error } = await supabase
+      .from('di1_prices')
       .select('*')
-      .gte('calculated_at', start_date)
-      .lte('calculated_at', end_date)
-      .order('calculated_at', { ascending: true });
-
-    if (pair_id) {
-      query = query.eq('id', pair_id);
-    }
-
-    const { data: opportunities, error } = await query;
+      .gte('date', start_date)
+      .lte('date', end_date)
+      .order('date', { ascending: true });
 
     if (error) {
-      console.error('[Backtest] Erro ao buscar oportunidades:', error);
+      console.error('[Backtest] Erro ao buscar preços:', error);
       return res.status(500).json({ success: false, error: error.message });
     }
 
-    if (!opportunities || opportunities.length === 0) {
+    if (!prices || prices.length === 0) {
       return res.json({
         success: true,
         trades: [],
@@ -101,49 +112,79 @@ module.exports = async (req, res) => {
       });
     }
 
-    console.log(`[Backtest] ${opportunities.length} oportunidades encontradas`);
+    console.log(`[Backtest] ${prices.length} preços carregados`);
 
-    // Simular trades
-    const trades = [];
-    const dailyPnL = [];
-    let cumulativePnL = 0;
-
-    // Agrupar por data e par
-    const oppsByDate = {};
-    for (const opp of opportunities) {
-      const date = opp.calculated_at?.substring(0, 10) || opp.date;
-      if (!oppsByDate[date]) oppsByDate[date] = [];
-      oppsByDate[date].push(opp);
+    // Agrupar preços por data
+    const pricesByDate = {};
+    for (const p of prices) {
+      if (!pricesByDate[p.date]) pricesByDate[p.date] = {};
+      pricesByDate[p.date][p.contract_code] = p.rate;
     }
 
-    const dates = Object.keys(oppsByDate).sort();
+    const dates = Object.keys(pricesByDate).sort();
+    console.log(`[Backtest] ${dates.length} dias únicos encontrados`);
 
-    // Estratégia simples: entrar quando |z-score| > 1.5, sair quando |z-score| < 0.5
+    // Definir pares a serem testados
+    const PAIRS = [
+      ['DI1F27', 'DI1F28'],
+      ['DI1F28', 'DI1F29'],
+      ['DI1F29', 'DI1F30'],
+      ['DI1F30', 'DI1F31'],
+      ['DI1F31', 'DI1F32'],
+      ['DI1F32', 'DI1F33']
+    ];
+
+    // Filtrar por pair_id se especificado
+    const pairsToTest = pair_id 
+      ? PAIRS.filter(([short, long]) => `${short}_${long}` === pair_id)
+      : PAIRS;
+
+    const trades = [];
+    const openPositions = new Map();
     const ENTRY_THRESHOLD = 1.5;
     const EXIT_THRESHOLD = 0.5;
-    const openPositions = new Map(); // pair_id -> {entry_spread, entry_zscore, entry_date, type}
 
-    for (const date of dates) {
-      const dailyOpps = oppsByDate[date];
-      let dailyPnLAmount = 0;
+    // Para cada par, calcular spreads e z-scores
+    for (const [shortContract, longContract] of pairsToTest) {
+      const pairKey = `${shortContract}_${longContract}`;
+      const spreads = [];
+      const validDates = [];
 
-      for (const opp of dailyOpps) {
-        const pairKey = `${opp.short_contract}_${opp.long_contract}`;
-        const currentZScore = opp.z_score;
-        const currentSpread = opp.current_spread;
+      // Montar série de spreads
+      for (const date of dates) {
+        const shortRate = pricesByDate[date][shortContract];
+        const longRate = pricesByDate[date][longContract];
+        
+        if (shortRate && longRate) {
+          spreads.push(shortRate - longRate);
+          validDates.push(date);
+        }
+      }
+
+      if (spreads.length < LOOKBACK + 10) {
+        console.log(`[Backtest] Par ${pairKey}: dados insuficientes (${spreads.length} dias)`);
+        continue;
+      }
+
+      console.log(`[Backtest] Par ${pairKey}: ${spreads.length} spreads calculados`);
+
+      // Simular trades com janela móvel
+      for (let i = LOOKBACK; i < spreads.length; i++) {
+        const window = spreads.slice(i - LOOKBACK, i);
+        const mean = calculateMean(window);
+        const stdDev = calculateStdDev(window, mean);
+        const currentSpread = spreads[i];
+        const zScore = calculateZScore(currentSpread, mean, stdDev);
+        const date = validDates[i];
+
         const position = openPositions.get(pairKey);
 
-        // Verificar saída de posição existente
+        // Verificar saída
         if (position) {
-          if (Math.abs(currentZScore) < EXIT_THRESHOLD) {
-            // Fechar posição
+          if (Math.abs(zScore) < EXIT_THRESHOLD) {
             const spreadChange = currentSpread - position.entry_spread;
             const pnlBps = position.type === 'BUY' ? spreadChange : -spreadChange;
-            
-            // Converter P&L de bps para R$ baseado no risco
-            // Simplificação: 1 bps de spread = (risk_amount / 100) em R$
-            // Isso significa que um movimento de 100 bps gera ganho/perda igual ao risco configurado
-            const pnlReais = pnlBps * (position.risk_amount / 100);
+            const pnlReais = pnlBps * (riskAmount / 100);
 
             trades.push({
               pair: pairKey,
@@ -152,22 +193,20 @@ module.exports = async (req, res) => {
               entry_spread: position.entry_spread,
               exit_spread: currentSpread,
               entry_zscore: position.entry_zscore,
-              exit_zscore: currentZScore,
+              exit_zscore: zScore,
               type: position.type,
               pnl: pnlReais,
               pnl_bps: pnlBps
             });
 
-            dailyPnLAmount += pnlReais;
             openPositions.delete(pairKey);
             console.log(`[Backtest] ${date} - FECHAR ${position.type} ${pairKey}: P&L = ${pnlBps.toFixed(2)} bps (R$ ${pnlReais.toFixed(2)})`);
           }
         } else {
-          // Verificar entrada de nova posição
-          if (Math.abs(currentZScore) > ENTRY_THRESHOLD) {
-            const tradeType = currentZScore > 0 ? 'SELL' : 'BUY';
+          // Verificar entrada
+          if (Math.abs(zScore) > ENTRY_THRESHOLD) {
+            const tradeType = zScore > 0 ? 'SELL' : 'BUY';
             
-            // Filtrar por tipo de trade selecionado
             const shouldEnter = 
               tradeTypeFilter === 'BOTH' ||
               (tradeTypeFilter === 'LONG' && tradeType === 'BUY') ||
@@ -176,17 +215,28 @@ module.exports = async (req, res) => {
             if (shouldEnter) {
               openPositions.set(pairKey, {
                 entry_spread: currentSpread,
-                entry_zscore: currentZScore,
+                entry_zscore: zScore,
                 entry_date: date,
-                type: tradeType,
-                risk_amount: riskAmount
+                type: tradeType
               });
-              console.log(`[Backtest] ${date} - ABRIR ${tradeType} ${pairKey}: Spread = ${currentSpread.toFixed(2)}, Z = ${currentZScore.toFixed(2)}, Risco = R$ ${riskAmount.toFixed(2)}`);
+              console.log(`[Backtest] ${date} - ABRIR ${tradeType} ${pairKey}: Z = ${zScore.toFixed(2)}`);
             }
           }
         }
       }
+    }
 
+    // Calcular P&L diário
+    const pnlByDate = {};
+    for (const trade of trades) {
+      if (!pnlByDate[trade.exit_date]) pnlByDate[trade.exit_date] = 0;
+      pnlByDate[trade.exit_date] += trade.pnl;
+    }
+
+    const dailyPnL = [];
+    let cumulativePnL = 0;
+    for (const date of dates) {
+      const dailyPnLAmount = pnlByDate[date] || 0;
       cumulativePnL += dailyPnLAmount;
       dailyPnL.push({
         date: date,

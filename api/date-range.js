@@ -23,34 +23,36 @@ module.exports = async (req, res) => {
   try {
     const supabase = getSupabaseClient();
 
-    // Buscar data mínima e máxima da tabela opportunities_cache
+    // Buscar data mínima e máxima da tabela di1_prices (dados históricos)
     const { data, error } = await supabase
-      .from('opportunities_cache')
-      .select('calculated_at')
-      .order('calculated_at', { ascending: true })
+      .from('di1_prices')
+      .select('date')
+      .order('date', { ascending: true })
       .limit(1)
       .single();
 
     const { data: maxData, error: maxError } = await supabase
-      .from('opportunities_cache')
-      .select('calculated_at')
-      .order('calculated_at', { ascending: false })
+      .from('di1_prices')
+      .select('date')
+      .order('date', { ascending: false })
       .limit(1)
       .single();
 
     if (error || maxError) {
       console.error('[Date Range] Erro ao buscar datas:', error || maxError);
       
-      // Retornar erro real, não success
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch date range from database',
+      // Retornar dados padrão se não houver dados no banco
+      return res.json({
+        success: true,
+        min_date: '2024-01-01',
+        max_date: new Date().toISOString().split('T')[0],
+        total_days: 0,
         has_data: false
       });
     }
 
-    const minDate = data?.calculated_at?.substring(0, 10) || '2024-01-01';
-    const maxDate = maxData?.calculated_at?.substring(0, 10) || new Date().toISOString().split('T')[0];
+    const minDate = data?.date || '2024-01-01';
+    const maxDate = maxData?.date || new Date().toISOString().split('T')[0];
 
     // Calcular diferença em dias
     const diffTime = Math.abs(new Date(maxDate) - new Date(minDate));

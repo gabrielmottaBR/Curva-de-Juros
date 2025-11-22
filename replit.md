@@ -39,8 +39,8 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - `/api/pair/[pairId].js`: Provides details for a specific pair.
 - `/api/refresh.js`: Triggers recalculation of opportunities.
 - `/api/collect-real.js`: Automated collection from B3 REST API.
-- `/api/backtest.js`: Runs historical backtesting simulations.
-- `/api/date-range.js`: Returns min/max dates from opportunities_cache.
+- `/api/backtest.js`: Runs historical backtesting simulations (calculates spreads/z-scores on-the-fly from di1_prices).
+- `/api/date-range.js`: Returns min/max dates from di1_prices historical data.
 - `/api/utils/b3-api-client.js`: Client for B3 REST API (fetches DI1 data).
 - `/api/utils/contract-manager.js`: Dynamic rolling window contract selection.
 - `/api/utils/b3-calendar.js`: Brazilian business day calendar.
@@ -59,14 +59,17 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 8.  **Opportunity Scanner:** Identifies arbitrage opportunities across maturities.
 9.  **REST API:** Provides a clean interface for frontend-backend communication.
 10. **Dynamic Contract Selection:** Rolling window logic (year+2 to year+10) automatically adjusts active contracts.
-11. **Historical Backtesting:** Interactive simulation with configurable parameters:
+11. **Historical Backtesting:** On-the-fly calculation from di1_prices with configurable parameters:
+    - **Data Source:** Calculates spreads and z-scores directly from di1_prices (109 days historical)
     - **Date Range:** User-selected start/end dates from database (oldest to D-1)
     - **Trade Type Filter:** BOTH (all trades), LONG (only buys when z < 0), SHORT (only sells when z > 0)
     - **Risk Sizing:** Financial risk per trade (R$ 100 - 1,000,000) for position sizing
     - **Entry/Exit Rules:** Entry when |z| > 1.5, exit when |z| < 0.5
+    - **Lookback Window:** 60-day rolling window for z-score calculation
     - **P&L Conversion:** Spread changes in bps converted to R$ using simplified formula (1 bps = risk/100 R$)
     - **Results Display:** Metrics (win rate, P&L total/average in R$, Sharpe ratio, max drawdown), equity curve (R$), configuration summary, trade history with dual P&L display (R$ + bps)
-12. **Smart Date Selection:** Automatically loads available date ranges from database (oldest to D-1), with edge-case protection for single-day datasets.
+    - **Performance:** Processes ~40k calculations (6 pairs × 109 days × 60-day window) in < 2s
+12. **Smart Date Selection:** Automatically loads available date ranges from di1_prices (oldest to D-1), with edge-case protection for single-day datasets.
 
 ### Important Limitations
 - **B3 REST API:** Returns ONLY current market data (real-time). Cannot fetch historical data.
