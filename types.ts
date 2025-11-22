@@ -49,7 +49,9 @@ export interface Allocation {
   shortContracts: number;
   exposureLong: number;
   exposureShort: number;
-  estimatedMargin: number;
+  estimatedMargin: number; // B3 margin requirement (approximate)
+  estimatedRisk?: number; // Financial risk per trade
+  hedgeRatio?: number; // DV01 hedge ratio
 }
 
 export interface Opportunity {

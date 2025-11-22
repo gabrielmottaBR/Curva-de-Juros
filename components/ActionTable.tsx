@@ -79,21 +79,33 @@ const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel,
         </table>
       </div>
 
-      <div className="mt-6 flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-        <div className="flex-1 flex items-center gap-3">
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
             <div className="p-2 bg-amber-500/10 rounded-lg">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
             </div>
             <div>
                 <div className="text-xs text-slate-400">Risco Financeiro</div>
-                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk.toLocaleString()}</div>
+                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk?.toLocaleString() || '0'}</div>
             </div>
         </div>
-         <div className="flex-1 border-l border-slate-700 pl-4">
+        
+        <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-cyan-700/50">
+            <div className="p-2 bg-cyan-500/10 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-cyan-500" />
+            </div>
+            <div>
+                <div className="text-xs text-slate-400">Margem Estimada</div>
+                <div className="font-mono font-bold text-cyan-200">R$ {allocation.estimatedMargin.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</div>
+            </div>
+        </div>
+        
+        <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
             <div className="text-xs text-slate-400">Hedge Ratio</div>
             <div className="font-mono font-bold text-slate-200">{calc.hedgeRatio.toFixed(3)}</div>
         </div>
-        <div className="flex-1 border-l border-slate-700 pl-4">
+        
+        <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
             <div className="text-xs text-slate-400">Cointegração (Proxy p-val)</div>
             <div className={`font-mono font-bold ${calc.cointegrationPValue < 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
                 {calc.cointegrationPValue}

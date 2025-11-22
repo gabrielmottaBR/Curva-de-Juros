@@ -12,6 +12,8 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 1. **Threshold Adjustment:** Entry threshold reduced from 2.0 to 1.5 (exit remains 0.5) to capture real market opportunities
 2. **Backtest Refactoring:** Changed from cache-based to on-the-fly calculation from di1_prices for historical accuracy
 3. **Signal Standardization:** Fixed backend/frontend mismatch - recommendations now use English enums consistently (BUY SPREAD, SELL SPREAD, NEUTRAL)
+4. **DV01/PU Calculation Fix:** Fixed bug where `short.du` (undefined) was used instead of `short.defaultDu`, causing NaN values in allocation
+5. **Margin Calculation:** Added estimated margin requirement (12% of notional value) to help traders plan capital allocation
 
 ## System Architecture
 

@@ -83,7 +83,9 @@ export const checkCointegration = (shortRates: number[], longRates: number[]): n
 export const calculateAllocation = (
   riskParams: RiskParams,
   dv01Long: number,
-  dv01Short: number
+  dv01Short: number,
+  puLong?: number,
+  puShort?: number
 ) => {
   const hedgeRatio = dv01Short === 0 ? 0 : dv01Long / dv01Short;
   
@@ -100,7 +102,8 @@ export const calculateAllocation = (
       shortContracts: 0,
       exposureLong: 0,
       exposureShort: 0,
-      estimatedRisk: 0
+      estimatedRisk: 0,
+      estimatedMargin: 0
     };
   }
 
@@ -116,12 +119,24 @@ export const calculateAllocation = (
   // Rounding to nearest integer for optimal hedge
   const shortContracts = Math.round(shortContractsRaw);
 
+  // Calculate estimated margin requirement
+  // B3 margin for DI1 futures ≈ 12% of notional value per contract
+  // Margin = (Long Contracts × PU Long + Short Contracts × PU Short) × 12%
+  let estimatedMargin = 0;
+  if (puLong && puShort) {
+    const MARGIN_RATE = 0.12; // 12% margin requirement (approximate)
+    const notionalLong = longContracts * puLong;
+    const notionalShort = shortContracts * puShort;
+    estimatedMargin = (notionalLong + notionalShort) * MARGIN_RATE;
+  }
+
   return {
     hedgeRatio,
     longContracts,
     shortContracts,
     exposureLong: 0, // Calculated in component using PU
     exposureShort: 0, // Calculated in component using PU
-    estimatedRisk: longContracts * riskPerContract
+    estimatedRisk: longContracts * riskPerContract,
+    estimatedMargin
   };
 };

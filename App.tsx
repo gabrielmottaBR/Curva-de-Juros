@@ -91,7 +91,13 @@ const App: React.FC = () => {
 
   const allocation = useMemo(() => {
     if (!calculationResult) return null;
-    return calculateAllocation(riskParams, calculationResult.dv01Long, calculationResult.dv01Short);
+    return calculateAllocation(
+      riskParams, 
+      calculationResult.dv01Long, 
+      calculationResult.dv01Short,
+      calculationResult.puLong,
+      calculationResult.puShort
+    );
   }, [riskParams, calculationResult]);
 
   return (
