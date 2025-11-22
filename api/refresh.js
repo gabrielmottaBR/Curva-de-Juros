@@ -70,11 +70,11 @@ const scanOpportunities = async (supabase) => {
       const latestShort = shortSeries[shortSeries.length - 1];
       const latestLong = longSeries[longSeries.length - 1];
       
-      const puShort = calculatePU(latestShort.rate, short.du);
-      const puLong = calculatePU(latestLong.rate, long.du);
-      const dv01Short = calculateDV01(latestShort.rate, short.du);
-      const dv01Long = calculateDV01(latestLong.rate, long.du);
-      const hedgeRatio = dv01Short / dv01Long;
+      const puShort = calculatePU(latestShort.rate, short.defaultDu);
+      const puLong = calculatePU(latestLong.rate, long.defaultDu);
+      const dv01Short = calculateDV01(latestShort.rate, short.defaultDu);
+      const dv01Long = calculateDV01(latestLong.rate, long.defaultDu);
+      const hedgeRatio = dv01Short === 0 ? 0 : dv01Long / dv01Short;
 
       const historicalData = shortSeries.map((s, idx) => ({
         date: s.date,
