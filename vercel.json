@@ -7,6 +7,9 @@
     },
     "api/test.js": {
       "maxDuration": 10
+    },
+    "api/collect-real.js": {
+      "maxDuration": 60
     }
   }
 }
