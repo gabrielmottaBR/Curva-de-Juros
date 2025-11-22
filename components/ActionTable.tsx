@@ -35,7 +35,7 @@ const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel,
         <div className="text-right">
            <div className="text-xs text-slate-400 uppercase tracking-wider">Z-Score</div>
            <div className={`text-3xl font-mono font-bold ${
-             calc.zScore > 2 ? 'text-rose-400' : (calc.zScore < -2 ? 'text-emerald-400' : 'text-slate-200')
+             calc.zScore > 1.5 ? 'text-rose-400' : (calc.zScore < -1.5 ? 'text-emerald-400' : 'text-slate-200')
            }`}>
              {calc.zScore.toFixed(2)}
            </div>

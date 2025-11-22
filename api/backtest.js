@@ -118,8 +118,8 @@ module.exports = async (req, res) => {
 
     const dates = Object.keys(oppsByDate).sort();
 
-    // Estratégia simples: entrar quando |z-score| > 2, sair quando |z-score| < 0.5
-    const ENTRY_THRESHOLD = 2.0;
+    // Estratégia simples: entrar quando |z-score| > 1.5, sair quando |z-score| < 0.5
+    const ENTRY_THRESHOLD = 1.5;
     const EXIT_THRESHOLD = 0.5;
     const openPositions = new Map(); // pair_id -> {entry_spread, entry_zscore, entry_date, type}
 
