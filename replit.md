@@ -35,10 +35,12 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 **Backend (Vercel Serverless API):**
 - `/api/_shared.js`: Shared utilities (Supabase client, CORS headers).
 - `/api/health.js`: Health check endpoint.
-- `/api/opportunities.js`: Lists identified opportunities.
+- `/api/opportunities.js`: Lists identified opportunities (supports `?metadata=true` for date range).
 - `/api/pair/[pairId].js`: Provides details for a specific pair.
 - `/api/refresh.js`: Triggers recalculation of opportunities.
 - `/api/collect-real.js`: Automated collection from B3 REST API.
+- `/api/backtest.js`: Runs historical backtesting simulations.
+- `/api/date-range.js`: Returns min/max dates from opportunities_cache.
 - `/api/utils/b3-api-client.js`: Client for B3 REST API (fetches DI1 data).
 - `/api/utils/contract-manager.js`: Dynamic rolling window contract selection.
 - `/api/utils/b3-calendar.js`: Brazilian business day calendar.
@@ -57,6 +59,8 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 8.  **Opportunity Scanner:** Identifies arbitrage opportunities across maturities.
 9.  **REST API:** Provides a clean interface for frontend-backend communication.
 10. **Dynamic Contract Selection:** Rolling window logic (year+2 to year+10) automatically adjusts active contracts.
+11. **Historical Backtesting:** Interactive simulation with configurable date ranges, entry/exit based on z-scores (|z| > 2.0 entry, |z| < 0.5 exit), displays metrics (win rate, P&L, Sharpe ratio, max drawdown), equity curve visualization, and trade history table.
+12. **Smart Date Selection:** Automatically loads available date ranges from database (oldest to D-1), with edge-case protection for single-day datasets.
 
 ### Important Limitations
 - **B3 REST API:** Returns ONLY current market data (real-time). Cannot fetch historical data.
