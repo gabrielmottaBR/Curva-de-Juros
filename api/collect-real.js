@@ -1,26 +1,24 @@
 /**
  * Endpoint: POST /api/collect-real
  * 
- * Coleta dados reais DI1 do PDF BDI_05 da B3
+ * Coleta dados reais DI1 da API REST da B3 (TEMPO REAL APENAS)
  * 
- * Query params:
- *   - date (opcional): Data em formato YYYY-MM-DD (default: último dia útil)
+ * IMPORTANTE: A API B3 retorna APENAS dados atuais do mercado.
+ * Para dados históricos, use scripts/import-real-data.cjs
  * 
  * Processo:
- *   1. Calcula data alvo (último pregão se não especificada)
- *   2. Download PDF BDI_05 com retry
- *   3. Parse e extração de dados DI1
- *   4. Validação (mínimo 7/9 contratos)
- *   5. UPSERT batch no Supabase
- *   6. Registro de metadata
+ *   1. Usa data atual (hoje)
+ *   2. Busca dados via API REST B3
+ *   3. Validação (mínimo 7/9 contratos)
+ *   4. UPSERT batch no Supabase (com deduplicação)
+ *   5. Registro de metadata
  * 
  * Retorno:
- *   {success: true, date: '2025-11-19', records: 9, source: 'bdi_pdf'}
+ *   {success: true, date: '2025-11-22', records: 9, source: 'b3_api'}
  */
 
 const { getSupabaseClient, setCorsHeaders, handleOptions } = require('../lib/_shared');
-const { downloadBDIPDF, getBDIPDFUrl } = require('./utils/pdf-downloader');
-const { parseBDIPDF, validateExtractedData } = require('./parsers/bdi-parser');
+const { fetchDI1DataFromAPI, validateExtractedData } = require('./utils/b3-api-client');
 const { getLastBusinessDay } = require('./utils/b3-calendar');
 const { getActiveContracts } = require('./utils/contract-manager');
 
@@ -33,61 +31,46 @@ module.exports = async (req, res) => {
   
   const startTime = Date.now();
   console.log('='.repeat(60));
-  console.log('📊 COLLECT REAL - Coleta de Dados B3');
+  console.log('📊 COLLECT REAL - Coleta de Dados B3 (API REST)');
   console.log('='.repeat(60));
   
   // Global try-catch to prevent FUNCTION_INVOCATION_FAILED
   try {
-    // 1. Determinar data alvo (usar let para permitir fallback)
-    const originalDate = req.query.date || getLastBusinessDay();
-    let targetDate = originalDate;
-    let year = new Date(targetDate).getFullYear();
-    let expectedContracts = getActiveContracts(year);
+    // 0. Rejeitar parâmetro date (API só funciona para dados atuais)
+    if (req.query.date) {
+      console.error(`❌ Parâmetro 'date' não é suportado`);
+      return res.status(400).json({
+        success: false,
+        error: 'Parâmetro não suportado',
+        message: 'A API B3 retorna apenas dados atuais. Para dados históricos, use scripts/import-real-data.cjs',
+        rejected_date: req.query.date
+      });
+    }
     
-    console.log(`📅 Data alvo: ${targetDate}`);
+    // 1. Determinar data atual (API B3 retorna APENAS dados atuais)
+    const today = new Date();
+    const targetDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const year = today.getFullYear();
+    const expectedContracts = getActiveContracts(year);
+    
+    console.log(`📅 Data atual: ${targetDate}`);
+    console.log(`⚠️  NOTA: API B3 retorna APENAS dados do mercado atual (não históricos)`);
     console.log(`📋 Contratos esperados (${year}): ${expectedContracts.join(', ')}`);
     console.log('');
     
-    // 2. Download PDF
-    console.log('📥 Step 1: Download PDF BDI_05...');
-    let pdfUrl = getBDIPDFUrl(targetDate);
-    console.log(`   URL: ${pdfUrl}`);
-    
-    let pdfBuffer;
-    try {
-      pdfBuffer = await downloadBDIPDF(targetDate, 3);
-    } catch (downloadError) {
-      console.error(`❌ Falha no download: ${downloadError.message}`);
-      
-      // Tentar dia útil anterior
-      const previousDay = getLastBusinessDay(new Date(targetDate));
-      console.log(`🔄 Tentando dia anterior: ${previousDay}`);
-      
-      try {
-        pdfBuffer = await downloadBDIPDF(previousDay, 2);
-        
-        // Atualizar todas variáveis dependentes da data
-        targetDate = previousDay;
-        year = new Date(targetDate).getFullYear();
-        expectedContracts = getActiveContracts(year);
-        pdfUrl = getBDIPDFUrl(targetDate);
-        
-        console.log(`✅ Sucesso com ${previousDay}`);
-      } catch (retryError) {
-        return res.status(404).json({
-          success: false,
-          error: 'PDF não encontrado',
-          message: `Não foi possível baixar PDF para ${originalDate} ou ${previousDay}`,
-          url: getBDIPDFUrl(originalDate)
-        });
-      }
-    }
-    
+    // 2. Buscar dados via API REST
+    console.log('🌐 Step 1: Buscando dados via API B3...');
+    const di1DataRaw = await fetchDI1DataFromAPI(targetDate);
     console.log('');
     
-    // 3. Parse PDF
-    console.log('🔍 Step 2: Parse PDF...');
-    const di1Data = await parseBDIPDF(pdfBuffer, targetDate);
+    // 3. Deduplicar (pegar última oferta de cada contrato)
+    console.log('🔄 Step 2: Deduplicando...');
+    const di1DataMap = new Map();
+    for (const item of di1DataRaw) {
+      di1DataMap.set(item.contract_code, item);
+    }
+    const di1Data = Array.from(di1DataMap.values());
+    console.log(`   ${di1DataRaw.length} registros → ${di1Data.length} únicos`);
     console.log('');
     
     // 4. Validação
@@ -132,13 +115,12 @@ module.exports = async (req, res) => {
     
     const rates = di1Data.map(d => d.rate);
     const actualContracts = di1Data.map(d => d.contract_code);
-    const fallbackUsed = targetDate !== originalDate;
     
     const metadata = {
-      source_type: 'bdi_pdf',
-      source_file: `BDI_05_${targetDate.replace(/-/g, '')}.pdf`,
+      source_type: 'b3_api',
+      source_file: 'https://cotacao.b3.com.br/mds/api/v1/DerivativeQuotation/DI1',
       import_timestamp: new Date().toISOString(),
-      records_raw: di1Data.length,
+      records_raw: di1DataRaw.length,
       records_unique: di1Data.length,
       records_imported: di1Data.length,
       date_range_start: targetDate,
@@ -147,8 +129,8 @@ module.exports = async (req, res) => {
       contracts_list: actualContracts.join(', '),
       rate_min: Math.min(...rates),
       rate_max: Math.max(...rates),
-      dedup_strategy: 'none',
-      notes: `Automated collection from B3 BDI_05 PDF. Imported: ${actualContracts[0]}-${actualContracts[actualContracts.length - 1]} (${actualContracts.length}/${expectedContracts.length} contracts)${fallbackUsed ? `. Fallback from ${originalDate} to ${targetDate}` : ''}`
+      dedup_strategy: 'last_per_contract',
+      notes: `Automated collection from B3 REST API. Imported: ${actualContracts[0]}-${actualContracts[actualContracts.length - 1]} (${actualContracts.length}/${expectedContracts.length} contracts). Deduped: ${di1DataRaw.length} → ${di1Data.length} records`
     };
     
     const { error: metadataError } = await supabase
@@ -174,14 +156,14 @@ module.exports = async (req, res) => {
       success: true,
       date: targetDate,
       records: di1Data.length,
-      source: 'bdi_pdf',
+      source: 'b3_api',
       contracts: di1Data.map(d => d.contract_code),
       rate_range: {
         min: Math.min(...rates).toFixed(4),
         max: Math.max(...rates).toFixed(4)
       },
       duration: `${duration}s`,
-      pdf_url: pdfUrl
+      api_url: 'https://cotacao.b3.com.br/mds/api/v1/DerivativeQuotation/DI1'
     });
     
   } catch (error) {
