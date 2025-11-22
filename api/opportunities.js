@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    const { metadata } = req.query;
     const supabase = getSupabaseClient();
 
     const { data, error } = await supabase
@@ -37,11 +38,26 @@ module.exports = async (req, res) => {
 
     const sorted = opportunities.sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore));
 
-    res.status(200).json({
+    const response = {
+      success: true,
       opportunities: sorted,
       mode: 'LIVE',
       count: sorted.length
-    });
+    };
+
+    // Adicionar metadata se solicitado
+    if (metadata === 'true' && data && data.length > 0) {
+      const dates = data.map(row => row.calculated_at?.substring(0, 10) || row.date).filter(Boolean);
+      dates.sort();
+      
+      response.metadata = {
+        oldest_date: dates[0],
+        latest_date: dates[dates.length - 1],
+        total_days: dates.length
+      };
+    }
+
+    res.status(200).json(response);
 
   } catch (err) {
     console.error('[Opportunities API] Unexpected error:', err);

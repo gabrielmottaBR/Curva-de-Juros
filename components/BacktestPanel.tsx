@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, Calendar, DollarSign } from 'lucide-react';
 
@@ -35,11 +35,71 @@ const BacktestPanel: React.FC = () => {
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
+  const [loadingDates, setLoadingDates] = useState(true);
   const [results, setResults] = useState<{
     metrics: BacktestMetrics;
     trades: Trade[];
     equity_curve: EquityCurvePoint[];
   } | null>(null);
+
+  // Carregar datas disponíveis do banco de dados
+  useEffect(() => {
+    const fetchDateRange = async () => {
+      setLoadingDates(true);
+      try {
+        const response = await fetch('/api/date-range');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.has_data) {
+          setStartDate(data.min_date);
+          
+          // Data final = dia anterior aos dados mais recentes (D-1)
+          // IMPORTANTE: Garantir que end_date nunca seja menor que min_date
+          const minDate = new Date(data.min_date);
+          const maxDate = new Date(data.max_date);
+          
+          // Se só há 1 dia de dados, usar a mesma data para início e fim
+          if (maxDate.getTime() === minDate.getTime()) {
+            setEndDate(data.min_date);
+            console.log(`[Backtest] Apenas 1 dia de dados: ${data.min_date}`);
+          } else {
+            // Subtrair 1 dia do max_date
+            maxDate.setDate(maxDate.getDate() - 1);
+            const dayBefore = maxDate.toISOString().split('T')[0];
+            
+            // Garantir que dayBefore >= min_date
+            if (dayBefore < data.min_date) {
+              setEndDate(data.min_date);
+            } else {
+              setEndDate(dayBefore);
+            }
+            console.log(`[Backtest] Datas do banco: ${data.min_date} a ${dayBefore}`);
+          }
+        } else {
+          // Fallback se não houver dados
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          setEndDate(yesterday.toISOString().split('T')[0]);
+          console.log('[Backtest] Usando datas padrão (sem dados no banco)');
+        }
+      } catch (error) {
+        console.error('[Backtest] Erro ao carregar datas:', error);
+        // Fallback em caso de erro
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        setEndDate(yesterday.toISOString().split('T')[0]);
+      } finally {
+        setLoadingDates(false);
+      }
+    };
+    
+    fetchDateRange();
+  }, []);
 
   const runBacktest = async () => {
     setLoading(true);
@@ -74,12 +134,13 @@ const BacktestPanel: React.FC = () => {
         <div>
           <label className="block text-sm text-slate-400 mb-2">Data Inicial</label>
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              disabled={loadingDates}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -87,12 +148,13 @@ const BacktestPanel: React.FC = () => {
         <div>
           <label className="block text-sm text-slate-400 mb-2">Data Final</label>
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              disabled={loadingDates}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -100,10 +162,10 @@ const BacktestPanel: React.FC = () => {
         <div className="flex items-end">
           <button
             onClick={runBacktest}
-            disabled={loading}
+            disabled={loading || loadingDates}
             className="w-full bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 disabled:from-slate-600 disabled:to-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
           >
-            {loading ? 'Processando...' : 'Executar Backtest'}
+            {loadingDates ? 'Carregando...' : loading ? 'Processando...' : 'Executar Backtest'}
           </button>
         </div>
       </div>

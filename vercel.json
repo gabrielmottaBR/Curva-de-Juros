@@ -10,6 +10,9 @@
     },
     "api/refresh.js": {
       "maxDuration": 120
+    },
+    "api/date-range.js": {
+      "maxDuration": 10
     }
   }
 }
