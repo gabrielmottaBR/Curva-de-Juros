@@ -90,15 +90,17 @@ const App: React.FC = () => {
   }, [detailedOpportunity]);
 
   const allocation = useMemo(() => {
-    if (!calculationResult) return null;
+    if (!calculationResult || !selectedOpportunity) return null;
     return calculateAllocation(
       riskParams, 
       calculationResult.dv01Long, 
       calculationResult.dv01Short,
       calculationResult.puLong,
-      calculationResult.puShort
+      calculationResult.puShort,
+      selectedOpportunity.shortId,
+      selectedOpportunity.longId
     );
-  }, [riskParams, calculationResult]);
+  }, [riskParams, calculationResult, selectedOpportunity]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 pb-20">

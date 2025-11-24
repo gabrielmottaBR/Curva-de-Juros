@@ -78,6 +78,99 @@ export const checkCointegration = (shortRates: number[], longRates: number[]): n
   return Number(pValueProxy.toFixed(3));
 };
 
+// --- B3 Margin Calculation (Real Data) ---
+
+/**
+ * B3 Margin Lookup Table
+ * Based on real simulations from simulador.b3.com.br (November 2025)
+ * 
+ * Data points:
+ * - F27 vs F28 (1y): 15 short + 12 long = R$ 18.434,83
+ * - F27 vs F29 (2y): 15 short + 10 long = R$ 22.820,20
+ * - F27 vs F30 (3y): 16 short + 10 long = R$ 29.716,04
+ * - F27 vs F31 (4y): 15 short + 9 long = R$ 30.505,72
+ * - F27 vs F32 (5y): 15 short + 9 long = R$ 32.021,53
+ */
+interface MarginTableEntry {
+  yearDiff: number;
+  baseMarginPerShort: number;
+  imbalanceFactor: number;
+}
+
+const B3_MARGIN_TABLE: MarginTableEntry[] = [
+  { yearDiff: 1, baseMarginPerShort: 1129, imbalanceFactor: 500 },
+  { yearDiff: 2, baseMarginPerShort: 1355, imbalanceFactor: 500 },
+  { yearDiff: 3, baseMarginPerShort: 1670, imbalanceFactor: 500 },
+  { yearDiff: 4, baseMarginPerShort: 1834, imbalanceFactor: 500 },
+  { yearDiff: 5, baseMarginPerShort: 1935, imbalanceFactor: 500 },
+];
+
+/**
+ * Calculates estimated B3 margin requirement for DI1 spread positions
+ * Uses lookup table based on real B3 simulator data
+ * 
+ * PRECISION:
+ * - 99.99% accuracy for tested cases (yearDiff 1-5)
+ * - Interpolated values for yearDiff outside 1-5 range (lower precision)
+ * 
+ * @param shortContracts Number of short contracts
+ * @param longContracts Number of long contracts  
+ * @param shortMaturity Short leg maturity (e.g., "DI1F27")
+ * @param longMaturity Long leg maturity (e.g., "DI1F28")
+ * @returns Estimated margin in BRL
+ */
+export const calculateB3Margin = (
+  shortContracts: number,
+  longContracts: number,
+  shortMaturity: string,
+  longMaturity: string
+): number => {
+  if (shortContracts === 0 && longContracts === 0) return 0;
+
+  const shortYearStr = shortMaturity.match(/(\d{2})$/)?.[1];
+  const longYearStr = longMaturity.match(/(\d{2})$/)?.[1];
+  
+  if (!shortYearStr || !longYearStr) {
+    console.warn(`Invalid maturity format: ${shortMaturity} or ${longMaturity}`);
+    return 0;
+  }
+
+  const shortYear = parseInt(shortYearStr) + 2000;
+  const longYear = parseInt(longYearStr) + 2000;
+  const yearDiff = Math.abs(longYear - shortYear);
+
+  if (yearDiff === 0) return 0;
+
+  let entry = B3_MARGIN_TABLE.find(e => e.yearDiff === yearDiff);
+  
+  if (!entry) {
+    if (yearDiff < 1) {
+      entry = B3_MARGIN_TABLE[0];
+    } else if (yearDiff > 5) {
+      entry = B3_MARGIN_TABLE[B3_MARGIN_TABLE.length - 1];
+    } else {
+      const lower = B3_MARGIN_TABLE.find(e => e.yearDiff < yearDiff);
+      const upper = B3_MARGIN_TABLE.find(e => e.yearDiff > yearDiff);
+      if (lower && upper) {
+        const ratio = (yearDiff - lower.yearDiff) / (upper.yearDiff - lower.yearDiff);
+        entry = {
+          yearDiff,
+          baseMarginPerShort: lower.baseMarginPerShort + ratio * (upper.baseMarginPerShort - lower.baseMarginPerShort),
+          imbalanceFactor: lower.imbalanceFactor + ratio * (upper.imbalanceFactor - lower.imbalanceFactor)
+        };
+      } else {
+        entry = B3_MARGIN_TABLE[B3_MARGIN_TABLE.length - 1];
+      }
+    }
+  }
+
+  const baseMargin = shortContracts * entry.baseMarginPerShort;
+  const imbalanceMargin = Math.abs(shortContracts - longContracts) * entry.imbalanceFactor;
+  const totalMargin = baseMargin + imbalanceMargin;
+
+  return Math.round(totalMargin);
+};
+
 // --- Risk Allocation ---
 
 export const calculateAllocation = (
@@ -85,13 +178,11 @@ export const calculateAllocation = (
   dv01Long: number,
   dv01Short: number,
   puLong?: number,
-  puShort?: number
+  puShort?: number,
+  shortMaturity?: string,
+  longMaturity?: string
 ) => {
   const hedgeRatio = dv01Short === 0 ? 0 : dv01Long / dv01Short;
-  
-  // Theoretical Risk Calculation:
-  // Risk = Contracts * DV01 * StopLossBps
-  // ContractsLong = MaxRisk / (DV01_Long * StopLoss * Stress)
   
   const riskPerContract = dv01Long * riskParams.stopLossBps;
   
@@ -107,35 +198,23 @@ export const calculateAllocation = (
     };
   }
 
-  // Max contracts allowed by risk budget
-  // Uses maxRiskBrl and stressFactor from the RiskParams interface correctly now
   const longContractsRaw = riskParams.maxRiskBrl / (riskPerContract * riskParams.stressFactor);
-  
-  // Ensure unitary lots (integers)
   const longContracts = Math.floor(Math.max(0, longContractsRaw));
   
-  // Hedge quantity
   const shortContractsRaw = longContracts * hedgeRatio;
-  // Rounding to nearest integer for optimal hedge
   const shortContracts = Math.round(shortContractsRaw);
 
-  // Calculate estimated margin requirement
-  // B3 margin for DI1 futures ≈ 12% of notional value per contract
-  // Margin = (Long Contracts × PU Long + Short Contracts × PU Short) × 12%
   let estimatedMargin = 0;
-  if (puLong && puShort) {
-    const MARGIN_RATE = 0.12; // 12% margin requirement (approximate)
-    const notionalLong = longContracts * puLong;
-    const notionalShort = shortContracts * puShort;
-    estimatedMargin = (notionalLong + notionalShort) * MARGIN_RATE;
+  if (shortMaturity && longMaturity) {
+    estimatedMargin = calculateB3Margin(shortContracts, longContracts, shortMaturity, longMaturity);
   }
 
   return {
     hedgeRatio,
     longContracts,
     shortContracts,
-    exposureLong: 0, // Calculated in component using PU
-    exposureShort: 0, // Calculated in component using PU
+    exposureLong: 0,
+    exposureShort: 0,
     estimatedRisk: longContracts * riskPerContract,
     estimatedMargin
   };
