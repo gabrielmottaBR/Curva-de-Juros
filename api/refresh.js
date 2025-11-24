@@ -45,19 +45,28 @@ const scanOpportunities = async (supabase) => {
         continue;
       }
 
-      const spreads = shortSeries.map((s, idx) => {
-        if (idx >= longSeries.length) return null;
-        return (s.rate - longSeries[idx].rate) * 100;
-      }).filter(s => s !== null);
+      // Align series by date before calculating spreads
+      const longByDate = new Map(longSeries.map(l => [l.date, l.rate]));
+      const spreads = shortSeries
+        .filter(s => longByDate.has(s.date))
+        .map(s => (s.rate - longByDate.get(s.date)) * 100);
 
       if (spreads.length < 20) continue;
 
       // Use only last LOOKBACK days for z-score calculation
       const recentSpreads = spreads.slice(-LOOKBACK);
-      const meanSpread = calculateMean(recentSpreads);
-      const stdDevSpread = calculateStdDev(recentSpreads, meanSpread);
       const currentSpread = recentSpreads[recentSpreads.length - 1];
-      const zScore = calculateZScore(currentSpread, meanSpread, stdDevSpread);
+      
+      // Calculate raw stats in same scale as spreads (already in bps)
+      const rawMean = calculateMean(recentSpreads);
+      const rawStdDev = calculateStdDev(recentSpreads, rawMean);
+      
+      // Z-score calculation (all values in bps)
+      const zScore = calculateZScore(currentSpread, rawMean, rawStdDev);
+      
+      // Store stats in bps for consistency
+      const meanSpread = rawMean;
+      const stdDevSpread = rawStdDev;
 
       const shortRates = shortSeries.map(s => s.rate);
       const longRates = longSeries.map(s => s.rate);
@@ -79,12 +88,15 @@ const scanOpportunities = async (supabase) => {
       const dv01Long = calculateDV01(latestLong.rate, long.defaultDu);
       const hedgeRatio = dv01Short === 0 ? 0 : dv01Long / dv01Short;
 
-      const historicalData = shortSeries.map((s, idx) => ({
-        date: s.date,
-        shortRate: s.rate,
-        longRate: longSeries[idx]?.rate || 0,
-        spread: (s.rate - (longSeries[idx]?.rate || 0)) * 100
-      }));
+      // Build historical data aligned by date
+      const historicalData = shortSeries
+        .filter(s => longByDate.has(s.date))
+        .map(s => ({
+          date: s.date,
+          shortRate: s.rate,
+          longRate: longByDate.get(s.date),
+          spread: (s.rate - longByDate.get(s.date)) * 100
+        }));
 
       opportunities.push({
         pair_id: `${short.id}_${long.id}`,

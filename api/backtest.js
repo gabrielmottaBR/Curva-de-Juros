@@ -171,9 +171,13 @@ module.exports = async (req, res) => {
       // Simular trades com janela móvel
       for (let i = LOOKBACK; i < spreads.length; i++) {
         const window = spreads.slice(i - LOOKBACK, i);
+        const currentSpread = spreads[i];
+        
+        // Calculate stats in same scale as spreads (already in bps from line 159)
         const mean = calculateMean(window);
         const stdDev = calculateStdDev(window, mean);
-        const currentSpread = spreads[i];
+        
+        // Z-score calculation (all values in bps)
         const zScore = calculateZScore(currentSpread, mean, stdDev);
         const date = validDates[i];
 

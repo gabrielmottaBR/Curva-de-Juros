@@ -8,7 +8,15 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 5000,
         host: '0.0.0.0',
-        allowedHosts: true
+        allowedHosts: true,
+        proxy: {
+          '/api': {
+            target: 'https://curvadejuros.vercel.app',
+            changeOrigin: true,
+            secure: true,
+            followRedirects: true
+          }
+        }
       },
       plugins: [react()],
       define: {
