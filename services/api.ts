@@ -1,9 +1,13 @@
 import { Opportunity } from '../types';
 
 // Use local proxy in development, direct URL in production
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? '/api' 
-  : 'https://curvadejuros.vercel.app/api';
+// Check if running on localhost/dev environment
+const isDev = window.location.hostname === 'localhost' 
+  || window.location.hostname === '127.0.0.1'
+  || window.location.hostname.includes('.replit.')
+  || window.location.port === '5000';
+
+const API_BASE_URL = isDev ? '/api' : 'https://curvadejuros.vercel.app/api';
 
 export interface ScanResult {
   opportunities: Opportunity[];
