@@ -10,7 +10,7 @@ import BacktestPanel from './components/BacktestPanel';
 import { CalculationResult, Opportunity, RiskParams } from './types';
 import { RISK_DEFAULTS } from './constants';
 import { scanOpportunities } from './services/marketData';
-import { fetchPairDetails, DetailedOpportunity } from './services/api';
+import { fetchPairDetails, DetailedOpportunity, fetchRealTimeSpread, RealTimeSpread } from './services/api';
 import { calculateAllocation } from './utils/math';
 import { AlertCircle } from 'lucide-react';
 
@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [detailedOpportunity, setDetailedOpportunity] = useState<DetailedOpportunity | null>(null);
+  const [realTimeSpread, setRealTimeSpread] = useState<RealTimeSpread | null>(null);
   const [riskParams, setRiskParams] = useState<RiskParams>(RISK_DEFAULTS);
   
   const [isLoadingScanner, setIsLoadingScanner] = useState(true);
@@ -56,15 +57,29 @@ const App: React.FC = () => {
     const loadDetails = async () => {
       if (!selectedOpportunity) {
         setDetailedOpportunity(null);
+        setRealTimeSpread(null);
         return;
       }
 
       try {
         const details = await fetchPairDetails(selectedOpportunity.id);
         setDetailedOpportunity(details);
+        
+        const rtSpread = await fetchRealTimeSpread(selectedOpportunity.shortId, selectedOpportunity.longId);
+        setRealTimeSpread(rtSpread);
+
+        const suggestedStopLoss = Math.round(details.stdDevSpread * 1.5);
+        const suggestedStopGain = Math.round(details.stdDevSpread * 2.0);
+        
+        setRiskParams(prev => ({
+          ...prev,
+          stopLossBps: Math.max(5, suggestedStopLoss),
+          stopGainBps: Math.max(10, suggestedStopGain)
+        }));
       } catch (err) {
         console.error('Failed to fetch pair details:', err);
         setDetailedOpportunity(null);
+        setRealTimeSpread(null);
       }
     };
     
@@ -74,20 +89,30 @@ const App: React.FC = () => {
   const calculationResult: CalculationResult | null = useMemo(() => {
     if (!detailedOpportunity) return null;
 
+    const currentSpread = realTimeSpread?.spread ?? detailedOpportunity.currentSpread;
+    
+    const zScore = detailedOpportunity.stdDevSpread !== 0 
+      ? (currentSpread - detailedOpportunity.meanSpread) / detailedOpportunity.stdDevSpread 
+      : 0;
+
+    let recommendation: 'BUY SPREAD' | 'SELL SPREAD' | 'NEUTRAL' = 'NEUTRAL';
+    if (zScore > 1.5) recommendation = 'SELL SPREAD';
+    else if (zScore < -1.5) recommendation = 'BUY SPREAD';
+
     return {
       puShort: detailedOpportunity.puShort,
       puLong: detailedOpportunity.puLong,
       dv01Short: detailedOpportunity.dv01Short,
       dv01Long: detailedOpportunity.dv01Long,
-      currentSpread: detailedOpportunity.currentSpread,
+      currentSpread,
       meanSpread: detailedOpportunity.meanSpread,
       stdDevSpread: detailedOpportunity.stdDevSpread,
-      zScore: detailedOpportunity.zScore,
+      zScore,
       cointegrationPValue: detailedOpportunity.cointegrationPValue,
       hedgeRatio: detailedOpportunity.hedgeRatio,
-      recommendation: detailedOpportunity.recommendation
+      recommendation
     };
-  }, [detailedOpportunity]);
+  }, [detailedOpportunity, realTimeSpread]);
 
   const allocation = useMemo(() => {
     if (!calculationResult || !selectedOpportunity) return null;

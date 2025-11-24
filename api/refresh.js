@@ -47,7 +47,7 @@ const scanOpportunities = async (supabase) => {
 
       const spreads = shortSeries.map((s, idx) => {
         if (idx >= longSeries.length) return null;
-        return s.rate - longSeries[idx].rate;
+        return (s.rate - longSeries[idx].rate) * 100;
       }).filter(s => s !== null);
 
       if (spreads.length < 20) continue;
@@ -83,7 +83,7 @@ const scanOpportunities = async (supabase) => {
         date: s.date,
         shortRate: s.rate,
         longRate: longSeries[idx]?.rate || 0,
-        spread: s.rate - (longSeries[idx]?.rate || 0)
+        spread: (s.rate - (longSeries[idx]?.rate || 0)) * 100
       }));
 
       opportunities.push({

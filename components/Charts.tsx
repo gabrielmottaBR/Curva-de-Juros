@@ -40,7 +40,9 @@ const Charts: React.FC<ChartsProps> = ({ data }) => {
                 domain={['dataMin', 'dataMax']} 
                 padding={{ top: 20, bottom: 20 }}
                 tick={{fill: '#94a3b8', fontSize: 10}}
-                stroke="#475569" 
+                stroke="#475569"
+                tickFormatter={(value) => value.toFixed(1)}
+                width={50}
             />
             <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9', borderRadius: '0.5rem' }}

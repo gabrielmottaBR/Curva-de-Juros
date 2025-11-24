@@ -86,3 +86,54 @@ export const triggerRecalculation = async (): Promise<void> => {
     throw error;
   }
 };
+
+export interface RealTimeSpread {
+  shortRate: number;
+  longRate: number;
+  spread: number;
+  timestamp: string;
+}
+
+export const fetchRealTimeSpread = async (shortId: string, longId: string): Promise<RealTimeSpread | null> => {
+  try {
+    const response = await fetch('https://cotacao.b3.com.br/mds/api/v1/DerivativeQuotation/DI1', {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn('Failed to fetch real-time data from B3 API');
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (!data.Scty || !Array.isArray(data.Scty)) {
+      console.warn('Invalid B3 API response format');
+      return null;
+    }
+
+    const shortContract = data.Scty.find((s: any) => s.symb === shortId);
+    const longContract = data.Scty.find((s: any) => s.symb === longId);
+    
+    if (!shortContract?.SctyQtn?.curPrc || !longContract?.SctyQtn?.curPrc) {
+      console.warn('Contract prices not found in B3 API response');
+      return null;
+    }
+
+    const shortRate = shortContract.SctyQtn.curPrc;
+    const longRate = longContract.SctyQtn.curPrc;
+    const spread = (shortRate - longRate) * 100;
+
+    return {
+      shortRate,
+      longRate,
+      spread,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error fetching real-time spread from B3:', error);
+    return null;
+  }
+};

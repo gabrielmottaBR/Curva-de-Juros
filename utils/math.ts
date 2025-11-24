@@ -207,34 +207,45 @@ export const calculateTargetSpreads = (
 };
 
 /**
- * Estimates half-life for spread convergence using mean-reversion model
- * Half-life = -ln(2) / speed_of_reversion
+ * Estimates half-life for spread convergence using AR(1) mean-reversion model
+ * Based on first-order autocorrelation (lag-1 correlation)
  * 
- * We estimate speed of reversion from historical volatility and current z-score
- * Simplified model: HL ≈ ln(2) / (σ/√days) where σ is daily volatility
+ * Formula: half-life = ln(2) / (-ln(ρ₁))
+ * where ρ₁ is the lag-1 autocorrelation coefficient
  * 
  * Returns estimated business days for spread to converge halfway to mean
+ * Returns 0 if data is insufficient or model assumptions are violated
  */
 export const calculateHalfLife = (
   historicalData: HistoricalData[] | undefined,
   currentZScore: number
 ): number => {
-  if (!historicalData || historicalData.length < 10) return 0;
+  if (!historicalData || historicalData.length < 20) return 0;
 
   const spreads = historicalData.map(d => d.spread);
-  const changes = [];
-  for (let i = 1; i < spreads.length; i++) {
-    changes.push(spreads[i] - spreads[i - 1]);
+  const mean = calculateMean(spreads);
+  
+  const deviations = spreads.map(s => s - mean);
+  
+  let numerator = 0;
+  let denominator = 0;
+  
+  for (let i = 0; i < deviations.length - 1; i++) {
+    numerator += deviations[i] * deviations[i + 1];
   }
-
-  if (changes.length === 0) return 0;
-
-  const volatility = calculateStdDev(changes, calculateMean(changes));
-  if (volatility === 0) return 0;
-
-  const reversionSpeed = volatility / Math.sqrt(historicalData.length);
-  const halfLife = Math.log(2) / reversionSpeed;
-
+  
+  for (let i = 0; i < deviations.length; i++) {
+    denominator += deviations[i] * deviations[i];
+  }
+  
+  if (denominator === 0) return 0;
+  
+  const rho1 = numerator / denominator;
+  
+  if (rho1 <= 0 || rho1 >= 1) return 0;
+  
+  const halfLife = Math.log(2) / (-Math.log(rho1));
+  
   return Math.max(1, Math.min(Math.round(halfLife), 252));
 };
 

@@ -156,7 +156,7 @@ module.exports = async (req, res) => {
         const longRate = pricesByDate[date][longContract];
         
         if (shortRate && longRate) {
-          spreads.push(shortRate - longRate);
+          spreads.push((shortRate - longRate) * 100);
           validDates.push(date);
         }
       }

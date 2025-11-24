@@ -10,7 +10,36 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ## Recent Changes (2025-11-24)
 
-### Latest Update: Multi Curvas Rebranding & Advanced Risk Management
+### Latest Update: Correções de Escala e Melhorias UX (Pendente Deployment)
+**⚠️ IMPORTANTE:** As mudanças de backend requerem deployment no Vercel para produção.
+
+1. **Correção Crítica de Escala (Spreads em Basis Points):**
+   - **Problema:** API B3 retorna taxas em % a.a. (ex: 12.5%), subtração dava 0.7% que era exibido como "0.7 bps" (incorreto)
+   - **Correção:** Multiplicar spreads por 100 para converter % → bps (0.7% = 70 bps)
+   - **Arquivos:** `api/refresh.js` (linha 53, 89), `api/backtest.js` (linha 162)
+   - **Impacto:** Spreads agora consistentes com stops (ex: spread 72 bps, stop loss 20 bps = 28% risco)
+   
+2. **Formatação do Gráfico:**
+   - Eixo Y com `tickFormatter` para melhor legibilidade (1 casa decimal)
+   - Width aumentado para 50px
+   
+3. **Spread em Tempo Real:**
+   - Nova função `fetchRealTimeSpread` que busca dados frescos da B3 API ao selecionar par
+   - Recálculo automático de z-score e recomendação com valores atualizados
+   - Fallback para cache se API B3 falhar (CORS/proxy)
+   
+4. **Auto-preenchimento de Stops:**
+   - Stop Loss: 1.5× desvio padrão histórico (mínimo 5 bps)
+   - Stop Gain: 2.0× desvio padrão histórico (mínimo 10 bps)
+   - Valores sugeridos automaticamente ao selecionar par, usuário pode editar manualmente
+   
+5. **Meia-Vida Estatística (AR(1)):**
+   - **Antiga:** Fórmula incorreta `volatility / √days` sem fundamento estatístico
+   - **Nova:** Modelo AR(1) usando autocorrelação lag-1: `half-life = ln(2) / (-ln(ρ₁))`
+   - Validação: ρ₁ deve estar entre 0 e 1 para mean-reversion válida
+   - Retorna 0 se dados insuficientes (<20 dias) ou modelo não aplicável
+
+### Previous Update: Multi Curvas Rebranding & Advanced Risk Management
 1. **Rebranding:** Site renamed from "Curva de Juros" to "Multi Curvas" (domains: multicurvas.com.br, multicurvas.com)
 2. **Enhanced Risk Management:**
    - Added **Stop Gain (bps)** parameter to complement Stop Loss
