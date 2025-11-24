@@ -10,6 +10,25 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 
 ## Recent Changes (2025-11-24)
 
+### Latest Update: Correção Crítica de Frontend em Produção (⏳ Aguardando Deployment)
+**⚠️ IMPORTANTE:** Mudança em services/api.ts requer deployment no Vercel para funcionar em produção.
+
+1. **Problema Identificado:**
+   - Site https://multicurvas.vercel.app/ mostrava "0 combinações analisadas"
+   - API retornava corretamente 36 oportunidades via backend
+   - Causa: Frontend usava URL absoluto `https://curvadejuros.vercel.app/api` (domínio antigo)
+
+2. **Correção Implementada (services/api.ts):**
+   - **Antes:** `const API_BASE_URL = isDev ? '/api' : 'https://curvadejuros.vercel.app/api';`
+   - **Depois:** `const API_BASE_URL = '/api';` (caminho relativo para todos os ambientes)
+   - **Benefício:** Funciona em qualquer domínio (multicurvas.vercel.app, curvadejuros.vercel.app)
+
+3. **Status:**
+   - ✅ Testado localmente (Replit): 36 oportunidades carregadas corretamente
+   - ⏳ Produção (Vercel): **Deployment pendente** - usuário precisa fazer push para o repositório Git
+
+## Recent Changes (2025-11-24)
+
 ### Latest Update: Correções de Escala e Melhorias UX (Pendente Deployment)
 **⚠️ IMPORTANTE:** As mudanças de backend requerem deployment no Vercel para produção.
 
