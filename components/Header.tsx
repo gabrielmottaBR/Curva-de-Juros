@@ -17,7 +17,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenEdu, connectionStatus = 'LIVE' })
             <Activity className="w-6 h-6 text-emerald-400" />
           </div>
           <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent tracking-tight">
-            Curva de Juros
+            Multi Curvas
           </h1>
         </div>
         

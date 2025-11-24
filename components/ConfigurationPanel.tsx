@@ -63,17 +63,16 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
               </div>
           </div>
            <div>
-              <label className="block text-xs text-slate-400 mb-1 font-medium uppercase">Fator de Stress</label>
+              <label className="block text-xs text-slate-400 mb-1 font-medium uppercase">Stop Gain (bps)</label>
               <div className="relative group">
                 <input 
                   type="number" 
-                  name="stressFactor"
-                  step="0.1"
-                  value={riskParams.stressFactor}
+                  name="stopGainBps"
+                  value={riskParams.stopGainBps}
                   onChange={handleRiskChange}
                   className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-sm text-right font-mono focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-200 group-hover:border-slate-600"
                 />
-                 <span className="absolute left-3 top-3 text-xs text-slate-500 font-mono">x</span>
+                 <span className="absolute left-3 top-3 text-xs text-slate-500 font-mono">bps</span>
               </div>
           </div>
         </div>

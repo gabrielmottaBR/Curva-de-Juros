@@ -1,4 +1,4 @@
-# Curva de Juros - Interest Rate Curve Analyzer
+# Multi Curvas - Interest Rate Curve Analyzer
 
 ## Overview
 This is a full-stack React + TypeScript + Vite + Express + Supabase application designed to analyze Brazilian interest rate curves (DI1 futures) and identify spread arbitrage opportunities. It collects real market data from B3, performs statistical analysis, and provides real-time trading insights through a responsive web interface. The project aims to deliver a robust, production-ready system for financial market analysis, utilizing 100% real B3 data.
@@ -9,6 +9,27 @@ This is a full-stack React + TypeScript + Vite + Express + Supabase application 
 - **Data Source:** Prioritize real B3 data, fallback to simulated when unavailable
 
 ## Recent Changes (2025-11-24)
+
+### Latest Update: Multi Curvas Rebranding & Advanced Risk Management
+1. **Rebranding:** Site renamed from "Curva de Juros" to "Multi Curvas" (domains: multicurvas.com.br, multicurvas.com)
+2. **Enhanced Risk Management:**
+   - Added **Stop Gain (bps)** parameter to complement Stop Loss
+   - Removed "Fator de Stress" (stress factor) from risk parameters
+   - Calculate and display **Spread Alvo para Gain** (target spread for gain exit)
+   - Calculate and display **Spread Alvo para Loss** (target spread for loss exit)
+   - Logic correctly handles BUY vs SELL direction: 
+     - BUY SPREAD: Target Gain = current + stopGain, Target Loss = current - stopLoss
+     - SELL SPREAD: Target Gain = current - stopGain, Target Loss = current + stopLoss
+3. **Advanced Metrics:**
+   - **Delta Total DV01:** Shows total DV01 delta of recommended position (dv01Long × longContracts - dv01Short × shortContracts)
+   - **Meia-Vida Estimada:** Estimates convergence time (business days) using mean-reversion speed from historical volatility
+4. **UI/UX Improvements:**
+   - Simplified margin disclaimer (removed technical precision details)
+   - All tooltips translated to Portuguese
+   - "High Conviction" → "Alta Convicção"
+   - Enhanced metrics display with color-coded indicators
+
+### Previous Changes
 1. **Threshold Adjustment:** Entry threshold reduced from 2.0 to 1.5 (exit remains 0.5) to capture real market opportunities
 2. **Backtest Refactoring:** Changed from cache-based to on-the-fly calculation from di1_prices for historical accuracy
 3. **Signal Standardization:** Fixed backend/frontend mismatch - recommendations now use English enums consistently (BUY SPREAD, SELL SPREAD, NEUTRAL)

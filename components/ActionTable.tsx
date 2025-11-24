@@ -1,6 +1,7 @@
 import React from 'react';
-import { CalculationResult, Allocation, RiskParams } from '../types';
-import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
+import { CalculationResult, Allocation, RiskParams, HistoricalData } from '../types';
+import { ArrowRight, AlertTriangle, TrendingDown, TrendingUp, Target, Clock } from 'lucide-react';
+import { calculateTargetSpreads, calculateHalfLife } from '../utils/math';
 
 interface ActionTableProps {
   calc: CalculationResult;
@@ -8,9 +9,10 @@ interface ActionTableProps {
   shortLabel: string;
   longLabel: string;
   risk: RiskParams;
+  historicalData?: HistoricalData[];
 }
 
-const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel, longLabel, risk }) => {
+const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel, longLabel, risk, historicalData }) => {
   const isBuy = calc.recommendation === 'BUY SPREAD';
   const isSell = calc.recommendation === 'SELL SPREAD';
   
@@ -18,6 +20,17 @@ const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel,
   const boxColor = isBuy ? 'bg-emerald-500/10 border-emerald-500/30' : (isSell ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-800 border-slate-700');
 
   const recommendationText = isBuy ? 'COMPRAR SPREAD' : (isSell ? 'VENDER SPREAD' : 'NEUTRO');
+
+  const deltaDV01 = (calc.dv01Long * allocation.longContracts) - (calc.dv01Short * allocation.shortContracts);
+  
+  const { targetGain, targetLoss } = calculateTargetSpreads(
+    calc.currentSpread,
+    calc.recommendation,
+    risk.stopGainBps,
+    risk.stopLossBps
+  );
+  
+  const halfLife = calculateHalfLife(historicalData, calc.zScore);
 
   return (
     <div className={`rounded-xl border ${boxColor} p-6`}>
@@ -79,51 +92,115 @@ const ActionTable: React.FC<ActionTableProps> = ({ calc, allocation, shortLabel,
         </table>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-            <div className="p-2 bg-amber-500/10 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-                <div className="text-xs text-slate-400">Risco Financeiro</div>
-                <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}</div>
-            </div>
+      <div className="mt-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400">Risco Financeiro</div>
+                  <div className="font-mono font-bold text-slate-200">R$ {allocation.estimatedRisk?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}</div>
+              </div>
+          </div>
+          
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-cyan-700/50">
+              <div className="p-2 bg-cyan-500/10 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-cyan-500" />
+              </div>
+              <div className="flex-1">
+                  <div className="text-xs text-slate-400">Margem Estimada B3</div>
+                  <div className="font-mono font-bold text-cyan-200">R$ {allocation.estimatedMargin.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</div>
+                  <a 
+                    href="https://simulador.b3.com.br" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 underline mt-0.5 inline-block"
+                  >
+                    Verificar no simulador B3
+                  </a>
+              </div>
+          </div>
+          
+          <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+              <div className="text-xs text-slate-400">Hedge Ratio</div>
+              <div className="font-mono font-bold text-slate-200">{calc.hedgeRatio.toFixed(3)}</div>
+          </div>
+          
+          <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+              <div className="text-xs text-slate-400">Cointegração (Proxy p-val)</div>
+              <div className={`font-mono font-bold ${calc.cointegrationPValue < 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {calc.cointegrationPValue}
+              </div>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-cyan-700/50">
-            <div className="p-2 bg-cyan-500/10 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-cyan-500" />
-            </div>
-            <div className="flex-1">
-                <div className="text-xs text-slate-400">Margem Estimada B3</div>
-                <div className="font-mono font-bold text-cyan-200">R$ {allocation.estimatedMargin.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</div>
-                <a 
-                  href="https://simulador.b3.com.br" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 underline mt-0.5 inline-block"
-                >
-                  Verificar no simulador B3
-                </a>
-            </div>
-        </div>
-        
-        <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-            <div className="text-xs text-slate-400">Hedge Ratio</div>
-            <div className="font-mono font-bold text-slate-200">{calc.hedgeRatio.toFixed(3)}</div>
-        </div>
-        
-        <div className="flex flex-col bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-            <div className="text-xs text-slate-400">Cointegração (Proxy p-val)</div>
-            <div className={`font-mono font-bold ${calc.cointegrationPValue < 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {calc.cointegrationPValue}
-            </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-purple-700/50">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-purple-500" />
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400">Delta Total DV01</div>
+                  <div className={`font-mono font-bold ${Math.abs(deltaDV01) < 50 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    R$ {Math.abs(deltaDV01).toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {Math.abs(deltaDV01) < 50 ? 'Bem Hedgeado' : 'Requer Ajuste'}
+                  </div>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-indigo-700/50">
+              <div className="p-2 bg-indigo-500/10 rounded-lg">
+                  <Clock className="w-5 h-5 text-indigo-500" />
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400">Meia-Vida Estimada</div>
+                  <div className="font-mono font-bold text-indigo-200">
+                    {halfLife > 0 ? `${halfLife} dias` : 'N/A'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Tempo p/ convergência
+                  </div>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-emerald-700/50">
+              <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <Target className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400">Spread Alvo (Gain)</div>
+                  <div className="font-mono font-bold text-emerald-200">
+                    {targetGain.toFixed(2)} bps
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Stop Gain: {risk.stopGainBps} bps
+                  </div>
+              </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-slate-900/50 p-4 rounded-lg border border-rose-700/50">
+              <div className="p-2 bg-rose-500/10 rounded-lg">
+                  <Target className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                  <div className="text-xs text-slate-400">Spread Alvo (Loss)</div>
+                  <div className="font-mono font-bold text-rose-200">
+                    {targetLoss.toFixed(2)} bps
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    Stop Loss: {risk.stopLossBps} bps
+                  </div>
+              </div>
+          </div>
         </div>
       </div>
       
       <div className="mt-4 bg-slate-800/30 border border-slate-700/50 p-3 rounded-lg">
         <p className="text-xs text-slate-400 leading-relaxed">
-          <span className="font-semibold text-slate-300">⚠️ Aviso:</span> A margem exibida é uma <strong>estimativa</strong> baseada em 5 simulações reais do sistema CORE da B3 (precisão 99.99% para spreads de 1-5 anos). 
+          <span className="font-semibold text-slate-300">⚠️ Aviso:</span> A margem exibida é uma <strong>estimativa</strong> baseada em simulações reais do sistema CORE da B3. 
           O valor real pode variar conforme volatilidade de mercado, correlação entre contratos e políticas da corretora. 
           <strong className="text-cyan-400"> Sempre consulte o simulador oficial da B3 antes de executar</strong>.
         </p>

@@ -192,27 +192,27 @@ const App: React.FC = () => {
                 label="Spread Atual" 
                 value={`${calculationResult.currentSpread.toFixed(2)} bps`} 
                 subValue={`Média: ${calculationResult.meanSpread.toFixed(2)}`}
-                tooltip="Difference between Long and Short rates"
+                tooltip="Diferença entre as taxas Long e Short"
               />
               <StatCard 
                 label="Z-Score" 
                 value={calculationResult.zScore.toFixed(2)} 
                 color={Math.abs(calculationResult.zScore) > 2 ? 'rose' : 'emerald'}
-                subValue={Math.abs(calculationResult.zScore) > 2 ? 'High Conviction' : 'Neutro'}
-                tooltip="Standard deviations from mean"
+                subValue={Math.abs(calculationResult.zScore) > 2 ? 'Alta Convicção' : 'Neutro'}
+                tooltip="Desvios padrão em relação à média histórica"
               />
               <StatCard 
                 label="Hedge Ratio" 
                 value={calculationResult.hedgeRatio.toFixed(3)} 
                 subValue={`1 Long : ${calculationResult.hedgeRatio.toFixed(1)} Short`}
                 color="amber"
-                tooltip="Ratio to neutralize DV01"
+                tooltip="Proporção para neutralizar o DV01"
               />
               <StatCard 
                 label="DV01 Long Leg" 
                 value={`R$ ${calculationResult.dv01Long.toFixed(2)}`} 
                 subValue="Por Contrato"
-                tooltip="Value change per 1bp move"
+                tooltip="Variação de valor por movimento de 1bp"
               />
             </div>
             
@@ -236,6 +236,7 @@ const App: React.FC = () => {
               shortLabel={selectedOpportunity.shortLabel}
               longLabel={selectedOpportunity.longLabel}
               risk={riskParams}
+              historicalData={detailedOpportunity.historicalData}
             />
           </div>
         ) : (

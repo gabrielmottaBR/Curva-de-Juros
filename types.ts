@@ -41,7 +41,7 @@ export interface CalculationResult {
 export interface RiskParams {
   maxRiskBrl: number;
   stopLossBps: number;
-  stressFactor: number; // Multiplier for stress testing
+  stopGainBps: number;
 }
 
 export interface Allocation {

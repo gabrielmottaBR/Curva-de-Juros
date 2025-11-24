@@ -171,6 +171,73 @@ export const calculateB3Margin = (
   return Math.round(totalMargin);
 };
 
+/**
+ * Calculates target spreads for gain and loss based on trade direction
+ * 
+ * For BUY SPREAD (buying when z < -1.5, spread is LOW):
+ *   - Target Gain: current + stopGain (spread increases)
+ *   - Target Loss: current - stopLoss (spread decreases further)
+ * 
+ * For SELL SPREAD (selling when z > 1.5, spread is HIGH):
+ *   - Target Gain: current - stopGain (spread decreases)
+ *   - Target Loss: current + stopLoss (spread increases further)
+ */
+export const calculateTargetSpreads = (
+  currentSpread: number,
+  recommendation: 'BUY SPREAD' | 'SELL SPREAD' | 'NEUTRAL',
+  stopGainBps: number,
+  stopLossBps: number
+): { targetGain: number; targetLoss: number } => {
+  if (recommendation === 'NEUTRAL') {
+    return { targetGain: currentSpread, targetLoss: currentSpread };
+  }
+
+  if (recommendation === 'BUY SPREAD') {
+    return {
+      targetGain: currentSpread + stopGainBps,
+      targetLoss: currentSpread - stopLossBps
+    };
+  }
+
+  // SELL SPREAD
+  return {
+    targetGain: currentSpread - stopGainBps,
+    targetLoss: currentSpread + stopLossBps
+  };
+};
+
+/**
+ * Estimates half-life for spread convergence using mean-reversion model
+ * Half-life = -ln(2) / speed_of_reversion
+ * 
+ * We estimate speed of reversion from historical volatility and current z-score
+ * Simplified model: HL ≈ ln(2) / (σ/√days) where σ is daily volatility
+ * 
+ * Returns estimated business days for spread to converge halfway to mean
+ */
+export const calculateHalfLife = (
+  historicalData: HistoricalData[] | undefined,
+  currentZScore: number
+): number => {
+  if (!historicalData || historicalData.length < 10) return 0;
+
+  const spreads = historicalData.map(d => d.spread);
+  const changes = [];
+  for (let i = 1; i < spreads.length; i++) {
+    changes.push(spreads[i] - spreads[i - 1]);
+  }
+
+  if (changes.length === 0) return 0;
+
+  const volatility = calculateStdDev(changes, calculateMean(changes));
+  if (volatility === 0) return 0;
+
+  const reversionSpeed = volatility / Math.sqrt(historicalData.length);
+  const halfLife = Math.log(2) / reversionSpeed;
+
+  return Math.max(1, Math.min(Math.round(halfLife), 252));
+};
+
 // --- Risk Allocation ---
 
 export const calculateAllocation = (
@@ -186,7 +253,7 @@ export const calculateAllocation = (
   
   const riskPerContract = dv01Long * riskParams.stopLossBps;
   
-  if (riskPerContract <= 0 || riskParams.stressFactor <= 0) {
+  if (riskPerContract <= 0) {
      return {
       hedgeRatio,
       longContracts: 0,
@@ -198,7 +265,7 @@ export const calculateAllocation = (
     };
   }
 
-  const longContractsRaw = riskParams.maxRiskBrl / (riskPerContract * riskParams.stressFactor);
+  const longContractsRaw = riskParams.maxRiskBrl / riskPerContract;
   const longContracts = Math.floor(Math.max(0, longContractsRaw));
   
   const shortContractsRaw = longContracts * hedgeRatio;

@@ -20,5 +20,5 @@ export const FACE_VALUE = 100000;
 export const RISK_DEFAULTS = {
   maxRiskBrl: 5000,
   stopLossBps: 20,
-  stressFactor: 1.0,
+  stopGainBps: 30,
 };
