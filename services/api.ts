@@ -1,13 +1,8 @@
 import { Opportunity } from '../types';
 
-// Use local proxy in development, direct URL in production
-// Check if running on localhost/dev environment
-const isDev = window.location.hostname === 'localhost' 
-  || window.location.hostname === '127.0.0.1'
-  || window.location.hostname.includes('.replit.')
-  || window.location.port === '5000';
-
-const API_BASE_URL = isDev ? '/api' : 'https://curvadejuros.vercel.app/api';
+// Use relative path /api for all environments
+// Works with Vite proxy in development and same-origin requests in production
+const API_BASE_URL = '/api';
 
 export interface ScanResult {
   opportunities: Opportunity[];
