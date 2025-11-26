@@ -1,0 +1,35 @@
+name: Daily B3 Data Collection
+
+on:
+  schedule:
+    # Runs at 0:00 UTC (21:00 BRT previous day) every day
+    - cron: '0 0 * * *'
+  
+  workflow_dispatch: # Permite execução manual
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📊 Collect B3 Data
+        run: |
+          echo "Starting B3 data collection..."
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            "https://curvadejuros.vercel.app/api/collect-real")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Collection successful!"
+            exit 0
+          else
+            echo "❌ Collection failed!"
+            exit 1
+          fi
