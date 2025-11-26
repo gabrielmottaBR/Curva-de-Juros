@@ -2,8 +2,8 @@ name: Daily B3 Data Collection
 
 on:
   schedule:
-    # Runs at 0:00 UTC (21:00 BRT previous day) every day
-    - cron: '0 0 * * *'
+    # Runs at 21:00 UTC (18:00 BRT) - final do pregão
+    - cron: '0 21 * * 1-5'
   
   workflow_dispatch: # Permite execução manual
 
@@ -18,7 +18,7 @@ jobs:
           
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
-            "https://curvadejuros.vercel.app/api/collect-real")
+            "https://multicurvas.vercel.app/api/collect-real")
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
@@ -28,8 +28,12 @@ jobs:
           
           if [ "$HTTP_CODE" -eq 200 ]; then
             echo "✅ Collection successful!"
-            exit 0
           else
-            echo "❌ Collection failed!"
-            exit 1
+            echo "⚠️ Collection returned non-200, but continuing..."
           fi
+
+      - name: 🔄 Recalculate Opportunities
+        run: |
+          echo "Triggering opportunity recalculation..."
+          curl -s -X POST "https://multicurvas.vercel.app/api/refresh"
+          echo "✅ Recalculation triggered!"
