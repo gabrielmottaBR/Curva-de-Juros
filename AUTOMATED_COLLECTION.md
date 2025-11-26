@@ -4,11 +4,20 @@ Este guia explica como configurar a coleta automática diária de dados B3 usand
 
 ## 📋 Visão Geral
 
-**Sistema:** Coleta automática de dados DI1 via PDF BDI_05 da B3  
-**Frequência:** Diária às 0:00 UTC (21:00 BRT, dia anterior)  
-**Fonte:** https://arquivos.b3.com.br/bdi/download/bdi/YYYY-MM-DD/BDI_05_YYYYMMDD.pdf  
+**Sistema:** Coleta automática de dados DI1 via **API REST da B3** (tempo real)  
+**Frequência:** Dias úteis (Seg-Sex) às 21:00 UTC (18:00 BRT) - fim do pregão  
+**Fonte:** `https://cotacao.b3.com.br/mds/api/v1/DerivativeQuotation/DI1`  
 **Endpoint:** `POST /api/collect-real`  
 **Contratos:** Rolling window de 9 contratos (ano+2 até ano+10)  
+**Convenção:** Apenas contratos DI1**F** (Janeiro) - ignora DI1J  
+
+### ⚠️ Limitação Importante da API B3
+
+A API REST da B3 retorna **APENAS dados em tempo real** durante o pregão. Ela **NÃO fornece dados históricos**. Por isso:
+
+- **Coleta deve ser feita durante o pregão** (10:00-18:00 BRT) ou logo após
+- **Dados históricos:** Use `scripts/import-real-data.cjs` com arquivos CSV do rb3
+- **Forward-fill automático:** Contratos não negociados no dia repetem a cotação do dia anterior
 
 ### Exemplo de Rolling Window:
 - **2025:** DI1F27 → DI1F35 (Jan/2027 até Jan/2035)
@@ -39,8 +48,8 @@ name: Daily B3 Data Collection
 
 on:
   schedule:
-    # Runs at 0:00 UTC (21:00 BRT previous day) every day
-    - cron: '0 0 * * *'
+    # Runs at 21:00 UTC (18:00 BRT) - final do pregão
+    - cron: '0 21 * * 1-5'
   
   workflow_dispatch: # Permite execução manual
 
@@ -55,7 +64,7 @@ jobs:
           
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST \
-            "https://curvadejuros.vercel.app/api/collect-real")
+            "https://multicurvas.vercel.app/api/collect-real")
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
@@ -65,11 +74,15 @@ jobs:
           
           if [ "$HTTP_CODE" -eq 200 ]; then
             echo "✅ Collection successful!"
-            exit 0
           else
-            echo "❌ Collection failed!"
-            exit 1
+            echo "⚠️ Collection returned non-200, but continuing..."
           fi
+
+      - name: 🔄 Recalculate Opportunities
+        run: |
+          echo "Triggering opportunity recalculation..."
+          curl -s -X POST "https://multicurvas.vercel.app/api/refresh"
+          echo "✅ Recalculation triggered!"
 ```
 
 ### Passo 3: Commit via Interface Web
@@ -109,7 +122,7 @@ jobs:
 2. **Supabase (Import Metadata):**
    ```sql
    SELECT * FROM import_metadata 
-   WHERE source_type = 'bdi_pdf' 
+   WHERE source_type = 'b3_api' 
    ORDER BY import_timestamp DESC 
    LIMIT 10;
    ```
@@ -126,7 +139,7 @@ jobs:
 ### Verificar Última Coleta:
 
 ```bash
-curl https://curvadejuros.vercel.app/api/opportunities | jq '.opportunities[0].date'
+curl https://multicurvas.vercel.app/api/opportunities | jq '.count'
 ```
 
 ---
@@ -136,41 +149,68 @@ curl https://curvadejuros.vercel.app/api/opportunities | jq '.opportunities[0].d
 ### Problema: Workflow não executa automaticamente
 
 **Solução:**
-- Verifique se o cron está correto: `0 0 * * *` (diário 0:00 UTC)
+- Verifique se o cron está correto: `0 21 * * 1-5` (dias úteis às 21:00 UTC)
 - GitHub Actions requer pelo menos 1 commit no branch principal nos últimos 60 dias
 - Faça um commit dummy se necessário
 
-### Problema: HTTP 404 (PDF não encontrado)
+### Problema: HTTP 400 (Parâmetro date não suportado)
 
-**Causa:** B3 não publicou PDF para o dia (feriado, final de semana, problema técnico)
-
-**Solução Automática:**
-- O endpoint tenta automaticamente o dia útil anterior
-- Se ambos falharem, retorna erro 404
-
-**Ação Manual:**
-```bash
-# Tentar dia específico
-curl -X POST "https://curvadejuros.vercel.app/api/collect-real?date=2025-11-19"
-```
-
-### Problema: HTTP 400 (Validação falhou)
-
-**Causa:** Menos de 7 contratos encontrados no PDF
+**Causa:** Tentou passar `?date=YYYY-MM-DD` no endpoint
 
 **Solução:**
-- Verificar PDF manualmente: https://arquivos.b3.com.br/bdi/download/bdi/2025-11-19/BDI_05_20251119.pdf
-- Se PDF está correto, o parser pode precisar de ajuste
-- Reportar issue com o PDF problemático
+- A API B3 só retorna dados em tempo real, não aceita parâmetro de data
+- Para dados históricos, use: `node scripts/import-real-data.cjs`
+
+### Problema: HTTP 400 (Validação falhou - menos de 7 contratos)
+
+**Causa:** Poucos contratos encontrados na API B3
+
+**Possíveis razões:**
+1. Mercado fechado (feriado, fim de semana, fora do pregão)
+2. Problema temporário na API B3
+3. Nenhum contrato sendo negociado no momento
+
+**Solução:**
+- Execute durante o pregão (10:00-18:00 BRT)
+- O sistema faz forward-fill automático para contratos faltantes
+- Verifique se há dados anteriores no banco para forward-fill funcionar
 
 ### Problema: HTTP 500 (Erro interno)
 
-**Causa:** Erro no servidor (Supabase, parsing, etc.)
+**Causa:** Erro no servidor (Supabase offline, problema de rede, etc.)
 
 **Solução:**
 1. Verificar logs do Vercel: https://vercel.com/dashboard
 2. Verificar Supabase está online
 3. Testar endpoint manualmente
+
+### Problema: Dados zerados ou incorretos
+
+**Causa:** API B3 pode retornar dados parciais fora do horário de pregão
+
+**Solução:**
+- Agende coleta para horário de pregão (10:00-18:00 BRT)
+- Workflow configurado para 21:00 UTC = 18:00 BRT (fim do pregão)
+
+---
+
+## 📊 Forward-Fill Automático
+
+Quando um contrato não é negociado no dia, o sistema automaticamente:
+
+1. Detecta contratos faltantes vs. esperados (rolling window)
+2. Busca a cotação mais recente de cada contrato faltante no banco
+3. Insere com a data atual e taxa anterior
+4. Registra no log: `✓ DI1F33: 12.5400% (forward-fill de 2025-11-20)`
+
+**Exemplo de log:**
+```
+🔄 Step 2.5: Forward-fill para contratos faltantes...
+   Contratos não negociados hoje: DI1F33, DI1F34
+   ✓ DI1F33: 12.5400% (forward-fill de 2025-11-20)
+   ✓ DI1F34: 12.6100% (forward-fill de 2025-11-20)
+   Forward-fill: 2 aplicados, 0 sem histórico
+```
 
 ---
 
@@ -185,7 +225,7 @@ node scripts/validate-real-data.cjs
 
 **Output esperado:**
 ```
-✅ Validation passed: All data is from bdi_pdf source
+✅ Validation passed: All data is from valid sources (b3_api, bdi_pdf, rb3_csv)
 ```
 
 **Exit code:** 0 = sucesso, 1 = falha
@@ -194,20 +234,16 @@ node scripts/validate-real-data.cjs
 
 ## 🔄 Recalcular Oportunidades
 
-Após coleta automática, as oportunidades devem ser recalculadas:
+O workflow já inclui recálculo automático após coleta. Para trigger manual:
 
 ```bash
-# Trigger recalculation
-curl -X POST https://curvadejuros.vercel.app/api/refresh
+curl -X POST https://multicurvas.vercel.app/api/refresh
 ```
 
-**Opcional:** Adicionar step ao workflow YAML:
-
-```yaml
-- name: 🔄 Recalculate Opportunities
-  run: |
-    curl -s -X POST "https://curvadejuros.vercel.app/api/refresh"
-```
+**Parâmetros de cálculo:**
+- **Lookback:** 30 dias (otimizado para melhor Sharpe ratio)
+- **Entry threshold:** |z| > 1.5
+- **Exit threshold:** |z| < 0.5
 
 ---
 
@@ -215,13 +251,13 @@ curl -X POST https://curvadejuros.vercel.app/api/refresh
 
 | Timezone | Horário | Descrição |
 |----------|---------|-----------|
-| UTC      | 0:00    | GitHub Actions executa |
-| BRT      | 21:00 (dia anterior) | Horário no Brasil |
-| B3       | Após 18:00 | PDF BDI_05 disponível |
+| UTC      | 21:00   | GitHub Actions executa |
+| BRT      | 18:00   | Fim do pregão B3 |
+| B3       | 10:00-18:00 | Horário de pregão |
 
 **Exemplo:**
-- **GitHub Actions:** 22/11/2025 às 0:00 UTC
-- **Brasil:** 21/11/2025 às 21:00 BRT
+- **GitHub Actions:** 21/11/2025 às 21:00 UTC
+- **Brasil:** 21/11/2025 às 18:00 BRT
 - **Coleta:** Dados do pregão de 21/11/2025
 
 ---
@@ -229,10 +265,10 @@ curl -X POST https://curvadejuros.vercel.app/api/refresh
 ## 🎯 Benefícios da Automação
 
 ✅ **Sem intervenção manual:** Coleta diária automática  
-✅ **Dados reais:** 100% B3 BDI PDF oficial  
+✅ **Dados reais:** 100% B3 API REST oficial  
 ✅ **Rolling window:** Contratos sempre atualizados por ano  
-✅ **Auditável:** Metadata completa de cada import  
-✅ **Resiliente:** Retry automático + fallback para dia anterior  
+✅ **Forward-fill:** Contratos faltantes preenchidos automaticamente  
+✅ **Resiliente:** Tratamento de erros + logging detalhado  
 ✅ **Validação:** Mínimo 7/9 contratos obrigatório  
 
 ---
@@ -240,29 +276,32 @@ curl -X POST https://curvadejuros.vercel.app/api/refresh
 ## 📚 Arquivos Relacionados
 
 - **Endpoint:** `api/collect-real.js`
-- **Parser:** `api/parsers/bdi-parser.js`
+- **API Client:** `api/utils/b3-api-client.js`
 - **Contract Manager:** `api/utils/contract-manager.js`
 - **Calendar:** `api/utils/b3-calendar.js`
-- **Downloader:** `api/utils/pdf-downloader.js`
-- **Test Script:** `scripts/test-collect-real.js`
+- **Refresh:** `api/refresh.js`
 - **Validation:** `scripts/validate-real-data.cjs`
+- **Import Manual:** `scripts/import-real-data.cjs`
 
 ---
 
 ## 💡 Comandos Úteis
 
 ```bash
-# Testar localmente
-node scripts/test-collect-real.js 2025-11-19
+# Trigger coleta manual (produção)
+curl -X POST "https://multicurvas.vercel.app/api/collect-real"
+
+# Recalcular oportunidades
+curl -X POST "https://multicurvas.vercel.app/api/refresh"
+
+# Verificar oportunidades
+curl "https://multicurvas.vercel.app/api/opportunities" | jq '.count'
 
 # Validar dados
 node scripts/validate-real-data.cjs
 
-# Trigger manual (produção)
-curl -X POST "https://curvadejuros.vercel.app/api/collect-real"
-
-# Verificar último import
-curl "https://curvadejuros.vercel.app/api/opportunities" | jq '.opportunities[0]'
+# Import histórico (via rb3 CSV)
+node scripts/import-real-data.cjs
 ```
 
 ---
@@ -271,9 +310,10 @@ curl "https://curvadejuros.vercel.app/api/opportunities" | jq '.opportunities[0]
 
 1. **Não commitar `.github/workflows/`** - Sempre no `.gitignore`
 2. **Configurar via GitHub web interface** - Única forma segura
-3. **Validar após deploy** - Executar manualmente 1x para testar
+3. **Executar durante pregão** - API B3 só retorna dados em tempo real
 4. **Monitorar primeiros dias** - Verificar logs no GitHub Actions
+5. **Forward-fill requer histórico** - Primeiro import manual necessário
 
 ---
 
-**✅ Setup completo!** O sistema agora coleta dados B3 automaticamente todos os dias.
+**✅ Setup completo!** O sistema agora coleta dados B3 automaticamente todos os dias úteis.
